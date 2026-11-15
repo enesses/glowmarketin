@@ -1566,10 +1566,30 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   function load(){ try{ const r=localStorage.getItem(STORAGE_KEY); if(r) return JSON.parse(r);}catch(e){} return null; }
   function save(){ try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(appData)); }catch(e){} }
   function defaults(){ return {isletme:null,kredi:100,toplamTaslak:0,icerikler:[],yorumlar:[],paket:'Plus',sss:[],ayarlar:{},google:null,meta:null,sosyal:[],videolar:[]}; }
-  let appData=load()||defaults();
-  const d0=defaults();
-  for(const k in d0){ if(appData[k]===undefined||appData[k]===null&&k!=='isletme') appData[k]=d0[k]; }
-  if(typeof appData.kredi!=='number') appData.kredi=100;
+  // Bozuk ya da eski sürümden kalan veriyi onar: yanlış türdeki alanlar varsayılana döner, uygulama çökmez.
+  function sanitize(raw){
+    const d=defaults(), o=(raw&&typeof raw==='object'&&!Array.isArray(raw))?raw:{};
+    const isObj=v=>v&&typeof v==='object'&&!Array.isArray(v);
+    const arr=v=>Array.isArray(v)?v.filter(isObj):[];
+    for(const k of ['icerikler','yorumlar','sosyal','videolar']) o[k]=arr(o[k]);
+    o.sss=arr(o.sss);
+    o.kredi=Number.isFinite(Number(o.kredi))?Math.max(0,Math.round(Number(o.kredi))):d.kredi;
+    o.toplamTaslak=Number.isFinite(Number(o.toplamTaslak))?Number(o.toplamTaslak):0;
+    if(!['Go','Plus','Max'].includes(o.paket)) o.paket=d.paket;
+    if(!isObj(o.ayarlar)) o.ayarlar={};
+    for(const k of ['google','meta']) if(!isObj(o[k])) o[k]=null;
+    if(isObj(o.isletme)){
+      const i=o.isletme;
+      for(const f of ['isletmeAdi','sektor','sehir','ulke','dil','uslup','onecikanlar','telefon','saatler','adres']) i[f]=i[f]==null?'':String(i[f]);
+      i.sss=Array.isArray(i.sss)?arr(i.sss):o.sss.map(s=>({...s}));
+      if(!i.isletmeAdi.trim()) o.isletme=null;
+    } else o.isletme=null;
+    o.icerikler.forEach(c=>{ for(const f of ['baslik','metin','gun','platform']) if(c[f]!=null&&typeof c[f]!=='string') c[f]=String(c[f]); });
+    o.yorumlar.forEach(y=>{ const n=Number(y.yildiz); y.yildiz=n>=1&&n<=5?Math.round(n):5; for(const f of ['musteriAdi','metin','yanit']) if(y[f]!=null&&typeof y[f]!=='string') y[f]=String(y[f]); });
+    o.sss.concat(o.isletme?o.isletme.sss:[]).forEach(s=>{ s.soru=String(s.soru??''); s.cevap=String(s.cevap??''); });
+    return o;
+  }
+  let appData=sanitize(load()||defaults());
 
   /* ---------- Constants ---------- */
   const DAYS=['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
