@@ -12,7 +12,7 @@ const PORT = Number(process.env.PORT || 3000);
 const KEY = process.env.DEEPSEEK_API_KEY || '';
 const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 const BASE = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
-const RATE = Number(process.env.RATE_LIMIT_PER_MIN || 20);
+const RATE = Math.max(1, Number(process.env.RATE_LIMIT_PER_MIN) || 20);
 const PUBLIC = path.join(__dirname, 'public');
 // Site ya da mobil uygulama başka bir adresten çağırıyorsa izin verilen kaynaklar (virgülle).
 // Örn: https://glowmarketing.com,capacitor://localhost,http://localhost
@@ -320,14 +320,34 @@ JSON biçimi: {"yanit":"...","kaynak":"sss|bilgi|yok"}`,
 /* ------------------------------------------------------------------ */
 /* HTTP sunucusu                                                       */
 /* ------------------------------------------------------------------ */
+// İstemci IP'si. X-Forwarded-For yalnızca güvenilen vekil sayısı kadar sağdan okunur
+// (Render/Railway gibi tek vekil: TRUST_PROXY=1). Vekilsiz çalışırken TRUST_PROXY=0 ver;
+// aksi halde istemci başlığı sahteleyip hız sınırını aşabilir.
+const TRUST_PROXY = Math.max(0, Math.floor(Number(process.env.TRUST_PROXY ?? 1)) || 0);
+function clientIp(req) {
+  let ip = req.socket.remoteAddress || '';
+  if (TRUST_PROXY > 0) {
+    const xff = String(req.headers['x-forwarded-for'] || '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (xff.length) ip = xff[Math.max(0, xff.length - TRUST_PROXY)];
+  }
+  return ip.replace(/^::ffff:/, '').slice(0, 64) || 'bilinmiyor';
+}
+
 const hits = new Map();
 function limited(ip) {
   const now = Date.now();
   const arr = (hits.get(ip) || []).filter((t) => now - t < 60000);
+  if (arr.length > RATE) { hits.set(ip, arr); return true; } // sınırdayken diziyi büyütme
   arr.push(now);
   hits.set(ip, arr);
   return arr.length > RATE;
 }
+// Eski IP kayıtlarını temizle (bellek sızıntısını önler)
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, arr] of hits) if (!arr.length || now - arr[arr.length - 1] > 60000) hits.delete(ip);
+  for (const [ip, arr] of videoHits) if (!arr.length || now - arr[arr.length - 1] > 3600000) videoHits.delete(ip);
+}, 5 * 60000).unref();
 
 function send(res, status, obj) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -558,7 +578,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, ai: Boolean(KEY), model: MODEL, ajanlar: Object.keys(AGENTS), media: Boolean(PUBLIC_URL), video: Boolean(videoProvider() && PUBLIC_URL), videoModel: VIDEO_MODEL });
     }
     if (url.pathname === '/api/video' && req.method === 'POST') {
-      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+      const ip = clientIp(req);
       if (!PUBLIC_URL) return send(res, 503, { error: 'Sunucuda PUBLIC_URL tanımlı değil; video kaydedilemiyor.' });
       const body = await readBody(req);
       if (videoLimited(ip)) return send(res, 429, { error: 'Saatlik video sınırına ulaşıldı. Biraz sonra tekrar dene.' });
@@ -571,7 +591,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/media') {
       if (req.method !== 'POST') return send(res, 405, { error: 'Yalnızca POST.' });
       if (!PUBLIC_URL) return send(res, 503, { error: 'Sunucuda PUBLIC_URL tanımlı değil; görsel yüklenemiyor.' });
-      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+      const ip = clientIp(req);
       if (limited(ip)) return send(res, 429, { error: 'Çok fazla istek. Bir dakika sonra tekrar dene.' });
       if (!/^image\/jpe?g$/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Yalnızca JPEG görsel kabul edilir.' });
       const buf = await readRaw(req, MEDIA_MAX);
@@ -593,7 +613,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/api/agent') {
       if (req.method !== 'POST') return send(res, 405, { error: 'Yalnızca POST.' });
-      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+      const ip = clientIp(req);
       if (limited(ip)) return send(res, 429, { error: 'Çok fazla istek. Bir dakika sonra tekrar dene.' });
       const body = await readBody(req);
       const agent = AGENTS[body.agent];
