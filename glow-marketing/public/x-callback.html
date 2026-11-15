@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>X bağlantısı · Glow Marketing</title>
+<style>body{font:15px system-ui,-apple-system,sans-serif;padding:28px;color:#5E554D;background:#F6F1EA}@media (prefers-color-scheme:dark){body{background:#15120F;color:#CFC6BC}}</style>
+</head>
+<body>
+<p id="m">X bağlantısı tamamlanıyor…</p>
+<script>
+/* X OAuth 2.0 dönüşü: kodu ve state'i ana pencereye iletir (aynı köken), sonra kapanır. Kodu burada değiştirmeyiz. */
+(function(){
+  var q=new URLSearchParams(location.search), m=document.getElementById('m');
+  var data={type:'glow-x-auth',code:q.get('code')||'',state:q.get('state')||'',error:q.get('error')||'',error_description:q.get('error_description')||''};
+  try{ history.replaceState(null,'',location.pathname); }catch(e){}
+  if(window.opener&&window.opener!==window){
+    try{ window.opener.postMessage(data,location.origin); }catch(e){}
+    m.textContent=data.error?'X bağlantısı iptal edildi. Bu pencere kapanıyor…':'Bağlantı tamamlandı, bu pencere kapanıyor…';
+    setTimeout(function(){ window.close(); },400);
+  }else{
+    m.textContent='Bu sayfa X giriş penceresi için. Uygulamaya dönüp Bağlantılar sayfasından tekrar dene.';
+  }
+})();
+</script>
+</body>
+</html>
