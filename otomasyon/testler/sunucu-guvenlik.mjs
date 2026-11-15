@@ -46,4 +46,8 @@ export default async function (base, ok, bad) {
     const r = await fetch(base + '/api/health', { headers: { Origin: 'https://kotu.example' } });
     return !r.headers.get('access-control-allow-origin') || 'izinsiz kaynağa izin verildi';
   });
+  await t('[sunucu] /api/health sürüm ve çalışma süresi', async () => {
+    const j = await (await fetch(base + '/api/health')).json();
+    return (typeof j.surum === 'string' && Number.isFinite(j.calisma) && j.ai === false) || JSON.stringify(j);
+  });
 }

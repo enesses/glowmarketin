@@ -14,6 +14,7 @@ const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 const BASE = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
 const RATE = Math.max(1, Number(process.env.RATE_LIMIT_PER_MIN) || 20);
 const PUBLIC = path.join(__dirname, 'public');
+const VERSION = (() => { try { return require('./package.json').version; } catch (_) { return '?'; } })();
 // Site ya da mobil uygulama başka bir adresten çağırıyorsa izin verilen kaynaklar (virgülle).
 // Örn: https://glowmarketing.com,capacitor://localhost,http://localhost
 const ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean);
@@ -127,11 +128,13 @@ async function deepseek(messages, { json = false, max_tokens = 900, temperature 
       }),
     });
   } catch (e) {
-    throw httpErr(504, e.name === 'AbortError' ? 'DeepSeek zamanında yanıt vermedi.' : 'DeepSeek’e bağlanılamadı.');
-  } finally {
     clearTimeout(timer);
+    throw httpErr(504, e.name === 'AbortError' ? 'DeepSeek zamanında yanıt vermedi.' : 'DeepSeek’e bağlanılamadı.');
   }
-  const body = await r.text();
+  let body;
+  try { body = await r.text(); } // zaman aşımı gövde okunurken de geçerli
+  catch (_) { throw httpErr(504, 'DeepSeek zamanında yanıt vermedi.'); }
+  finally { clearTimeout(timer); }
   if (!r.ok) {
     let detail = '';
     try { detail = JSON.parse(body).error?.message || ''; } catch (_) {}
@@ -145,7 +148,8 @@ async function deepseek(messages, { json = false, max_tokens = 900, temperature 
     console.error(`[deepseek] ${r.status} ${detail}`);
     throw httpErr(r.status >= 500 ? 502 : r.status, map[r.status] || 'DeepSeek şu an yanıt vermiyor.');
   }
-  const j = JSON.parse(body);
+  let j;
+  try { j = JSON.parse(body); } catch (_) { throw httpErr(502, 'DeepSeek geçersiz bir yanıt döndürdü.'); }
   const content = j.choices?.[0]?.message?.content || '';
   if (!content.trim()) throw httpErr(502, 'Yapay zekâ boş yanıt döndürdü.');
   return { text: content.trim(), usage: j.usage };
@@ -388,7 +392,9 @@ function readRaw(req, limit) {
 
 function cleanUploads() {
   const now = Date.now();
-  for (const f of fs.readdirSync(UPLOADS)) {
+  let files = [];
+  try { files = fs.readdirSync(UPLOADS); } catch (e) { return console.error('[uploads] okunamadı:', e.message); }
+  for (const f of files) {
     const p = path.join(UPLOADS, f);
     try { if (now - fs.statSync(p).mtimeMs > MEDIA_TTL) fs.unlinkSync(p); } catch (_) {}
   }
@@ -503,7 +509,12 @@ async function videoSubmit(b) {
 const videoDone = new Map(); // taskId -> yerel mp4 adresi (sunucu yeniden başlarsa dosya adından bulunur)
 function videoFileName(taskId) { return require('crypto').createHash('sha256').update(taskId).digest('hex').slice(0, 32) + '.mp4'; }
 
-async function saveVideo(taskId, srcUrl, headers) {
+const videoSaving = new Map(); // aynı görev için eşzamanlı yoklamalar videoyu iki kez indirmesin
+function saveVideo(taskId, srcUrl, headers) {
+  if (!videoSaving.has(taskId)) videoSaving.set(taskId, saveVideoOnce(taskId, srcUrl, headers).finally(() => videoSaving.delete(taskId)));
+  return videoSaving.get(taskId);
+}
+async function saveVideoOnce(taskId, srcUrl, headers) {
   const name = videoFileName(taskId), file = path.join(UPLOADS, name);
   if (!fs.existsSync(file)) {
     const r = await fetch(srcUrl, { headers, redirect: 'follow', signal: AbortSignal.timeout(180000) });
@@ -511,7 +522,7 @@ async function saveVideo(taskId, srcUrl, headers) {
     if (Number(r.headers.get('content-length')) > VIDEO_MAX) throw httpErr(502, 'Üretilen video çok büyük.');
     const buf = Buffer.from(await r.arrayBuffer());
     if (buf.length > VIDEO_MAX || buf.length < 1000) throw httpErr(502, 'Üretilen video geçersiz.');
-    fs.writeFileSync(file, buf);
+    fs.writeFileSync(file + '.tmp', buf); fs.renameSync(file + '.tmp', file); // yarım dosya "hazır" sanılmasın
     console.log(`[video] kaydedildi ${name} ${(buf.length / 1048576).toFixed(1)} MB`);
   }
   const u = `${PUBLIC_URL}/media/${name}`;
@@ -539,7 +550,9 @@ async function videoStatus(taskId) {
   if (st !== 'COMPLETED' && st !== 'completed') return { status: 'RUNNING', progress: st === 'IN_QUEUE' || st === 'pending' || st === 'queued' ? 0.1 : 0.5 };
   if (!PUBLIC_URL) throw httpErr(503, 'Sunucuda PUBLIC_URL tanımlı değil; video kaydedilemiyor.');
   if (provider === 'fal') {
-    const res2 = await fetch(base, { headers, redirect: 'error', signal: AbortSignal.timeout(45000) });
+    let res2;
+    try { res2 = await fetch(base, { headers, redirect: 'error', signal: AbortSignal.timeout(45000) }); }
+    catch (_) { return { status: 'RUNNING', progress: 0.9, retry: true }; }
     if ([400, 422].includes(res2.status)) return { status: 'FAILED', error: 'Sağlayıcı bu videoyu üretemedi (içerik reddedildi). Komutu değiştirip tekrar dene.' };
     if (!res2.ok) return { status: 'RUNNING', progress: 0.9, retry: true };
     data = await res2.json().catch(() => null);
@@ -587,7 +600,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   try {
     if (url.pathname === '/api/health' && req.method === 'GET') {
-      return send(res, 200, { ok: true, ai: Boolean(KEY), model: MODEL, ajanlar: Object.keys(AGENTS), media: Boolean(PUBLIC_URL), video: Boolean(videoProvider() && PUBLIC_URL), videoModel: VIDEO_MODEL });
+      return send(res, 200, { ok: true, surum: VERSION, calisma: Math.round(process.uptime()), ai: Boolean(KEY), model: MODEL, ajanlar: Object.keys(AGENTS), media: Boolean(PUBLIC_URL), video: Boolean(videoProvider() && PUBLIC_URL), videoModel: VIDEO_MODEL });
     }
     if (url.pathname === '/api/video' && req.method === 'POST') {
       const ip = clientIp(req);
@@ -646,6 +659,23 @@ const server = http.createServer(async (req, res) => {
     if (e.status === 413) res.setHeader('Connection', 'close'); // okunmayan gövdeyi beklemeden bağlantıyı kapat
     send(res, e.status || 500, { error: e.status ? e.message : 'Sunucu hatası.' });
   }
+});
+
+// Yavaş istemciler bağlantı tutup sunucuyu yormasın
+server.headersTimeout = 20000;
+server.requestTimeout = 120000;
+
+process.on('unhandledRejection', (e) => console.error('[hata] yakalanmamış söz:', e));
+// Render/Railway yeniden başlatırken (SIGTERM) açık istekleri bitir, sonra çık
+for (const sig of ['SIGTERM', 'SIGINT']) process.once(sig, () => {
+  console.log(`[sunucu] ${sig} alındı, kapanıyor…`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 10000).unref();
+});
+
+server.on('error', (e) => {
+  console.error(e.code === 'EADDRINUSE' ? `HATA: ${PORT} numaralı port kullanımda. Başka bir PORT ver ya da çalışan sunucuyu kapat.` : e);
+  process.exit(1);
 });
 
 server.listen(PORT, () => {
