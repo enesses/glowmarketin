@@ -1564,7 +1564,11 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   /* ---------- Storage ---------- */
   const STORAGE_KEY='glowMarketingApp';
   function load(){ try{ const r=localStorage.getItem(STORAGE_KEY); if(r) return JSON.parse(r);}catch(e){} return null; }
-  function save(){ try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(appData)); }catch(e){} }
+  let saveUyari=false;
+  function save(){
+    try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(appData)); saveUyari=false; }
+    catch(e){ if(!saveUyari){ saveUyari=true; setTimeout(()=>toast('Veriler bu tarayıcıya kaydedilemedi (depolama dolu ya da gizli sekme). Sayfayı kapatırsan son değişiklikler kaybolabilir.',true),0); } }
+  }
   function defaults(){ return {isletme:null,kredi:100,toplamTaslak:0,icerikler:[],yorumlar:[],paket:'Plus',sss:[],ayarlar:{},google:null,meta:null,sosyal:[],videolar:[]}; }
   // Bozuk ya da eski sürümden kalan veriyi onar: yanlış türdeki alanlar varsayılana döner, uygulama çökmez.
   function sanitize(raw){
@@ -1654,7 +1658,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   function starsHtml(n){ let s=''; for(let i=1;i<=5;i++) s+=`<span class="${i<=n?'on':''}">★</span>`; return `<span class="stars" aria-label="${n} yıldız">${s}</span>`; }
   function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
   let toastT;
-  function toast(msg,err){ const t=$('toast'); t.textContent=msg; t.className='toast show'+(err?' error':''); clearTimeout(toastT); toastT=setTimeout(()=>t.className='toast',2400); }
+  function toast(msg,err){ const t=$('toast'); t.textContent=msg; t.className='toast show'+(err?' error':''); clearTimeout(toastT); toastT=setTimeout(()=>t.className='toast',Math.min(9000,Math.max(err?4000:2400,String(msg).length*55))); }
   function I(){ return appData.isletme||{}; }
   function hasCredit(n=1){ if(appData.kredi<n){ toast(appData.kredi<=0?'Kredin bitti. Paket sayfasından yenileyebilirsin.':`Bu işlem ${n} kredi gerektiriyor, ${appData.kredi} kredin var.`,true); return false; } return true; }
   function spend(n=1){ if(!hasCredit(n)) return false; appData.kredi-=n; appData.toplamTaslak++; save(); renderChrome(); renderPaket(); return true; }
@@ -1685,6 +1689,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     }catch(e){ throw new Error(e.name==='AbortError'?'Yanıt çok uzun sürdü.':e.message==='Failed to fetch'?'Sunucuya ulaşılamadı.':e.message); }
     finally{ clearTimeout(tm); }
   }
+  function dolu(v){ if(typeof v!=='string'||!v.trim()) throw new Error('Yapay zekâdan boş yanıt geldi.'); return v; }
   function busy(btn,on,label){
     if(on){ btn.dataset.label=btn.lastChild.textContent; btn.classList.add('loading'); btn.lastChild.textContent=label||'Yazılıyor…'; }
     else { btn.classList.remove('loading'); btn.lastChild.textContent=label||btn.dataset.label||btn.lastChild.textContent; }
@@ -1692,9 +1697,10 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   // AI açıksa ajanı çağırır; kapalıysa şablon yedeğini kullanır. Kredi yalnızca başarıda düşer.
   async function runAgent({btn,cost=1,label,agent,payload,fallback,apply,doneLabel}){
     if(btn.classList.contains('loading')||!hasCredit(cost)) return;
-    if(!AI.on){ const out=fallback(); if(out==null) return; spend(cost); apply(out,'template'); if(doneLabel) btn.lastChild.textContent=doneLabel; toast(`Şablonla üretildi · ${cost} kredi`); return; }
+    if(!AI.on){ const out=fallback(); if(out==null) return; apply(out,'template'); spend(cost); if(doneLabel) btn.lastChild.textContent=doneLabel; toast(`Şablonla üretildi · ${cost} kredi`); return; }
     busy(btn,true,label);
-    try{ const out=await aiCall(agent,payload); spend(cost); apply(out,'ai'); busy(btn,false,doneLabel); toast(`Hazır · ${cost} kredi kullanıldı`); }
+    // Önce sonucu uygula, sonra krediyi düş: yanıt bozuk gelirse kredi gitmez.
+    try{ const out=await aiCall(agent,payload); apply(out||{},'ai'); spend(cost); busy(btn,false,doneLabel); toast(`Hazır · ${cost} kredi kullanıldı`); }
     catch(e){ busy(btn,false); toast(e.message+' Kredi düşülmedi.',true); }
   }
   function copyText(t){ if(!t) return toast('Kopyalanacak metin yok.',true); (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Panoya kopyalandı.')).catch(()=>{ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); toast('Panoya kopyalandı.');}catch(e){toast('Kopyalanamadı.',true);} ta.remove(); }); }
@@ -1995,7 +2001,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     const ta=$('modalTaslakMetin'); ta.classList.add('busy');
     runAgent({btn:$('btnTaslakUret'),agent:'icerik',payload:{amac,platform,not},doneLabel:'Yeniden üret',
       fallback:()=>generateDraft(amac,platform),
-      apply:(out,mode)=>{ ta.value=mode==='ai'?out.metin:out; }
+      apply:(out,mode)=>{ ta.value=mode==='ai'?dolu(out.metin):out; }
     }).finally(()=>ta.classList.remove('busy'));
   };
 
@@ -2030,7 +2036,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     const platformlar=[...haftalikSecim], odak=$('haftalikOdak').value.trim();
     runAgent({btn:$('btnHaftalikUret'),cost:3,agent:'haftalik',payload:{platformlar,odak},label:'Plan hazırlanıyor…',doneLabel:'Yeniden oluştur',
       fallback:()=>templatePlan(platformlar),
-      apply:(out,mode)=>{ haftalikPlan=(mode==='ai'?out.plan:out).map(p=>({...p,secili:true})); renderHaftalikSonuc(); }
+      apply:(out,mode)=>{ const pl=mode==='ai'?out.plan:out; if(!Array.isArray(pl)||!pl.length) throw new Error('Plan boş geldi.'); haftalikPlan=pl.filter(p=>p&&typeof p.metin==='string').map(p=>({...p,baslik:String(p.baslik||p.gun||''),secili:true})); renderHaftalikSonuc(); }
     });
   };
   $('btnHaftalikEkle').onclick=()=>{
@@ -2129,7 +2135,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     const ta=$('modalYorumYanit'); ta.classList.add('busy');
     runAgent({btn:$('btnYorumTaslakOner'),agent:'yorum',payload:{musteriAdi:musteriAdi.split(/\s+/)[0],yildiz:yildizSec,metin},doneLabel:'Yeniden öner · 1 kredi',
       fallback:()=>replyDraft(musteriAdi,yildizSec),
-      apply:(out,mode)=>{ ta.value=mode==='ai'?out.yanit:out; }
+      apply:(out,mode)=>{ ta.value=mode==='ai'?dolu(out.yanit):out; }
     }).finally(()=>ta.classList.remove('busy'));
   };
   function saveYorum(close){
@@ -2211,7 +2217,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     const ta=$('sosyalYanit'); ta.classList.add('busy');
     runAgent({btn:$('btnSosyalOner'),agent:'sosyal',payload:{platform:s.platform,kullanici:s.kullanici,yorum:s.metin,gonderi:s.gonderiMetin},doneLabel:'Yeniden öner · 1 kredi',
       fallback:()=>sosyalSablon(s),
-      apply:(out,mode)=>{ ta.value=mode==='ai'?out.yanit:out; }
+      apply:(out,mode)=>{ ta.value=mode==='ai'?dolu(out.yanit):out; }
     }).finally(()=>ta.classList.remove('busy'));
   };
   $('btnSosyalKaydet').onclick=()=>{ const s=appData.sosyal[editSosyalIdx]; if(!s) return; s.yanit=$('sosyalYanit').value.trim(); save(); closeModal(); renderAll(); toast('Yanıt kaydedildi.'); };
@@ -2628,7 +2634,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     vOku();
     runAgent({btn,agent:'video',payload:{fikir:vDurum.fikir,stil:vDurum.stil,sure:vDurum.sure,oran:vDurum.oran,gorselVar:!!vDurum.gorsel},label:'Senaryo yazılıyor…',
       fallback:()=>videoSablon(),
-      apply:out=>{ vDurum.prompt=out.prompt; vDurum.baslik=out.baslik||'AI video'; vDurum.aciklama=out.aciklama||''; renderVideo(); }
+      apply:out=>{ vDurum.prompt=dolu(out.prompt); vDurum.baslik=out.baslik||'AI video'; vDurum.aciklama=out.aciklama||''; renderVideo(); }
     });
   }
   async function vUret(btn){
@@ -2821,7 +2827,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     const q=$('musteriSoruInput').value.trim(); if(!q) return toast('Önce bir soru yaz.',true);
     runAgent({btn:$('btnMusteriYanitHazirla'),agent:'musteri',payload:{soru:q},
       fallback:()=>findAnswer(q),
-      apply:(out,mode)=>{ gecmis.unshift(mode==='ai'?{q,a:out.yanit,src:KAYNAK[out.kaynak]||KAYNAK.bilgi}:{q,a:out.text,src:'Şablon · '+out.src}); $('musteriSoruInput').value=''; renderMusteri(); }
+      apply:(out,mode)=>{ gecmis.unshift(mode==='ai'?{q,a:dolu(out.yanit),src:KAYNAK[out.kaynak]||KAYNAK.bilgi}:{q,a:out.text,src:'Şablon · '+out.src}); $('musteriSoruInput').value=''; renderMusteri(); }
     });
   };
 
@@ -3024,6 +3030,16 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     history.pushState(null,'',url); route();
   });
   window.addEventListener('popstate',route);
+  // Başka sekmede yapılan değişiklikleri al; bu sekmedeki eski veri onu ezmesin.
+  window.addEventListener('storage',e=>{
+    if(e.key!==STORAGE_KEY) return;
+    let yeni=null; try{ yeni=e.newValue?JSON.parse(e.newValue):null; }catch(_){ return; }
+    appData=sanitize(yeni||defaults());
+    if(!appBooted||legalKey()) return;
+    if(!appData.isletme){ closeModal(); showSetup(); return; }
+    if(!$('mainApp').classList.contains('hidden')){ if(!openModalEl) renderAll(); else renderChrome(); }
+    else showApp();
+  });
   route();
   renderAI(); checkAI().then(()=>vPoll());
 })();

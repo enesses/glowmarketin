@@ -8,5 +8,8 @@
 - Mobil (360 px) yatay taşma giderildi: tek sütun düzenlerde `1fr` → `minmax(0,1fr)` (İşletme formu, Yorumlar).
 - Türkçe ek hatası: paket düğmeleri "Go’e/Plus’e geç" → "Go’ya/Plus’a/Max’e geç". Mobilde yanlış yönlendiren "Soldan …" ifadeleri düzeltildi.
 - Erişilebilirlik: pencerelerde odak tuzağı (Tab döngüsü), kapanınca odağı açan düğmeye geri verme; onay penceresinde Escape = Vazgeç (önceden alttaki pencereyi kapatıyordu); onayda odak Vazgeç/onay kutusuna gider; bildirim (toast) `role=status aria-live`; seçim düğmelerinde `aria-pressed`.
+- Kredi güvenliği: `runAgent` önce sonucu uygular, sonra krediyi düşer; yapay zekâdan boş/bozuk yanıt gelirse kredi gitmez ("Kredi düşülmedi" mesajı artık doğru).
+- localStorage yazılamazsa (kota/gizli sekme) kullanıcı bir kez uyarılır; çoklu sekme: `storage` olayıyla diğer sekmedeki değişiklik alınır (eski sekme yeni veriyi ezmez).
+- Hata bildirimleri metin uzunluğuna göre daha uzun ekranda kalır (en az 4 sn).
 
 ## Kalanlar
