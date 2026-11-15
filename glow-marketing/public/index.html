@@ -2567,8 +2567,8 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     if(appData.paket!=='Max'){
       el.innerHTML=`<div class="v-lock">
         <div class="eyebrow" style="color:#BFAE9F">Max paketine özel</div>
-        <h2>Restoranın için dakikalar içinde Reels videosu.</h2>
-        <p>Ne çekmek istediğini bir cümleyle yaz ya da tabağının fotoğrafını yükle. Yapay zekâ senaryoyu yazar, Seedance 5–15 saniyelik videoyu üretir; tek tıkla Instagram Reels’te ve Facebook’ta paylaşırsın.</p>
+        <h2>${({restoran:'Restoranın',guzellik:'Salonun',perakende:'Mağazan'})[I().sektor]||'İşletmen'} için dakikalar içinde Reels videosu.</h2>
+        <p>Ne çekmek istediğini bir cümleyle yaz ya da ${I().sektor==='restoran'?'tabağının':'ürününün'} fotoğrafını yükle. Yapay zekâ senaryoyu yazar, Seedance 5–15 saniyelik videoyu üretir; tek tıkla Instagram Reels’te ve Facebook’ta paylaşırsın.</p>
         <ul>${['Metinden ya da fotoğraftan video','Dikey, kare ve yatay format','Hazır Türkçe paylaşım metni','Reels ve Facebook’ta tek tık yayın'].map(t=>`<li>${ic('check')}${t}</li>`).join('')}</ul>
         <div class="actions"><button class="btn btn-primary" data-action="nav" data-section="paket">Max’e geç</button><span style="color:#BFAE9F;font-size:13.5px;align-self:center">Şu anki paketin: ${esc(appData.paket)}</span></div>
       </div>`;
@@ -2585,7 +2585,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
         <div class="field"><span class="label">Başlangıç fotoğrafı <span class="faint" style="font-weight:600">(isteğe bağlı)</span></span>
           <div class="img-drop">${d.yukleniyor?`<div class="ph-ico">${ic('refresh')}</div><div class="txt"><b>Yükleniyor…</b></div>`
             :d.gorsel?`<img src="${esc(d.gorsel)}" alt="Başlangıç karesi"><div class="txt"><b>İlk kare hazır</b>Video bu fotoğraftan başlar.</div><div class="acts"><button type="button" class="btn btn-quiet btn-sm" data-action="v-gorsel-sil">Kaldır</button></div>`
-            :`<div class="ph-ico">${ic('box')}</div><div class="txt"><b>Kendi tabağını canlandır</b>${AI.media?'Gerçek ürün fotoğrafın videonun ilk karesi olur.':'Fotoğraf yüklemek için sunucuda PUBLIC_URL gerekli.'}</div>${AI.media?`<div class="acts"><button type="button" class="btn btn-ghost btn-sm" data-action="v-gorsel-sec">Seç</button></div>`:''}`}</div></div>
+            :`<div class="ph-ico">${ic('box')}</div><div class="txt"><b>${I().sektor==='restoran'?'Kendi tabağını canlandır':'Kendi fotoğrafını canlandır'}</b>${AI.media?'Gerçek ürün fotoğrafın videonun ilk karesi olur.':'Fotoğraf yüklemek için sunucuda PUBLIC_URL gerekli.'}</div>${AI.media?`<div class="acts"><button type="button" class="btn btn-ghost btn-sm" data-action="v-gorsel-sec">Seç</button></div>`:''}`}</div></div>
         <div class="grid-2">
           <div class="field"><span class="label">Format</span><div class="seg" id="vOran">${Object.entries(V_ORAN).map(([k,v])=>`<button type="button" data-v="${k}" class="${d.oran===k?'on':''}">${v}</button>`).join('')}</div></div>
           <div class="field"><span class="label">Süre</span><div class="seg" id="vSure">${Object.entries(V_SURE).map(([k,v])=>`<button type="button" data-v="${k}" class="${String(d.sure)===k?'on':''}">${v}</button>`).join('')}</div></div>

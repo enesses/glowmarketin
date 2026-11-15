@@ -15,5 +15,6 @@
 - 320 px genişlikte Bağlantılar ve AI video sayfalarındaki taşma giderildi; 1280/360/320 px ve tüm pencereler Playwright ile tarandı, taşma kalmadı.
 - Formlar Enter ile gönderilebiliyor (kaydet düğmeleri `type=submit`, çift tetikleme yok). `prefers-reduced-motion` desteği. Soluk metin rengi (`--ink-3`) WCAG AA kontrastına çekildi (açık #776C63, koyu #978C82).
 - Gece yarısını geçen açık sayfada "bugün" vurgusu ve gün seçenekleri dakikada bir / sekmeye dönünce yenilenir. Aynı anda ikinci onay penceresi açılması engellendi (ilk onayın sözü askıda kalıyordu).
+- AI video tanıtım metni sektöre göre (Restoranın / Salonun / Mağazan / İşletmen; "tabağının" yalnızca restoranda). Koyu tema ekran görüntüleriyle kontrol edildi.
 
 ## Kalanlar
