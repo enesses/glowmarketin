@@ -1600,7 +1600,8 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   /* ---------- Constants ---------- */
   const DAYS=['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
   const DAY_SHORT=['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
-  const TODAY=DAYS[[6,0,1,2,3,4,5][new Date().getDay()]];
+  const bugunAdi=()=>DAYS[[6,0,1,2,3,4,5][new Date().getDay()]];
+  let TODAY=bugunAdi();
   const PLATFORMS={instagram:{ad:'Instagram',c:'var(--ig)'},facebook:{ad:'Facebook',c:'var(--fb)'},google:{ad:'Google',c:'var(--gg)'},x:{ad:'X',c:'var(--xx)'}};
   const SEKTOR={restoran:'Restoran / Kafe',guzellik:'Güzellik / Kuaför',perakende:'Perakende',diger:'Diğer'};
   const PLANS={
@@ -1733,6 +1734,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   });
 
   function confirmAsk({title,text,ok='Onayla',danger=false,check=''}){
+    if($('modalOnay').classList.contains('open')) return Promise.resolve(false); // aynı anda ikinci onay açılmasın
     return new Promise(res=>{
       $('onayBaslik').textContent=title; $('onayMetin').textContent=text||'';
       const okB=$('onayTamam'); okB.textContent=ok; okB.className='btn '+(danger?'btn-danger':'btn-primary');
@@ -1750,8 +1752,12 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   function segVal(el){ return el.dataset.value; }
   document.addEventListener('click',e=>{ const b=e.target.closest('.seg button'); if(!b) return; const s=b.parentElement; s.querySelectorAll('button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-pressed',String(x===b)); }); s.dataset.value=b.dataset.v; });
   const platformLabels=Object.fromEntries(Object.entries(PLATFORMS).map(([k,v])=>[k,v.ad]));
-  const dayOpts=DAYS.map(d=>`<option value="${d}">${d}${d===TODAY?' (bugün)':''}</option>`).join('');
-  $('modalIcerikGun').innerHTML=dayOpts; $('modalTaslakGun').innerHTML=dayOpts;
+  function gunSecenekleri(){ const v1=$('modalIcerikGun').value, v2=$('modalTaslakGun').value; const o=DAYS.map(d=>`<option value="${d}">${d}${d===TODAY?' (bugün)':''}</option>`).join(''); $('modalIcerikGun').innerHTML=o; $('modalTaslakGun').innerHTML=o; if(v1) $('modalIcerikGun').value=v1; if(v2) $('modalTaslakGun').value=v2; }
+  gunSecenekleri();
+  // Sayfa gece yarısını geçerek açık kaldıysa "bugün" vurgusunu yenile
+  function gunKontrol(){ const t=bugunAdi(); if(t===TODAY) return; TODAY=t; gunSecenekleri(); if(appBooted&&!$('mainApp').classList.contains('hidden')) renderAll(); }
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) gunKontrol(); });
+  setInterval(gunKontrol,60000);
 
   /* ---------- Navigation ---------- */
   let current='anasayfa';
