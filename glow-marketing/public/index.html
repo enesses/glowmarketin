@@ -2640,6 +2640,206 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     toast('Video takvime eklendi. Buradan Reels olarak yayınlayabilirsin.');
   }
 
+  /* ---------- Meta Reklamları (Marketing API · ajan/meta-ads) ----------
+     Ayrı izin: ads_read, ads_management, business_management. Reklam hesapları, 7/30 gün özet,
+     kampanya listesi ve yayınlanmış bir gönderiyi DURAKLATILMIŞ (PAUSED) taslak kampanya olarak öne çıkarma.
+     Kural: bu kod asla ACTIVE kampanya/reklam seti/reklam oluşturmaz ve durum değiştirmez; yayına alma Ads Manager'da kullanıcıdadır. */
+  const MA_SCOPES=['ads_read','ads_management','business_management'];
+  const MA={hesaplar:null,ozet:null,kampanyalar:null,donem:'last_7d',yukleniyor:false,hata:'',taslak:null};
+  const MA_DONEM={last_7d:'Son 7 gün',last_30d:'Son 30 gün'};
+  const MA_KURUSSUZ=['CLP','COP','CRC','HUF','ISK','IDR','JPY','KRW','PYG','TWD','VND'];
+  const MA_HESAP_DURUM={1:'Aktif',2:'Devre dışı',3:'Ödeme sorunu',7:'İncelemede',8:'Ödeme bekleniyor',9:'Ek süre',100:'Kapanıyor',101:'Kapalı',201:'Aktif',202:'Kapalı'};
+  const MA_KAMP_DURUM={ACTIVE:'Yayında',PAUSED:'Duraklatıldı',DELETED:'Silindi',ARCHIVED:'Arşivde',IN_PROCESS:'İşleniyor',WITH_ISSUES:'Sorunlu',CAMPAIGN_PAUSED:'Duraklatıldı',ADSET_PAUSED:'Duraklatıldı',PENDING_REVIEW:'İncelemede',DISAPPROVED:'Reddedildi'};
+  function maConnected(){ const a=appData.metaAds; return !!(a&&a.token&&a.adAccountId); }
+  function maExpired(){ const a=appData.metaAds; return !!(a&&(a.hata==='token'||(a.tokenExp&&Date.now()>a.tokenExp))); }
+  function maLogin(){
+    const id=mAppId();
+    if(!id) return Promise.reject(new Error('Meta Uygulama Kimliği girilmemiş. Önce Instagram ve Facebook kartındaki alana yaz.'));
+    if(!/^https?:$/.test(location.protocol)) return Promise.reject(new Error('Meta girişi için uygulamanın bir web adresinden (https) açılması gerekiyor.'));
+    const state='ma'+Math.random().toString(36).slice(2)+Date.now().toString(36);
+    const q=new URLSearchParams({client_id:id,display:'popup',redirect_uri:mRedirect(),response_type:'token',scope:MA_SCOPES.join(','),state});
+    const w=window.open(`https://www.facebook.com/${gv()}/dialog/oauth?${q}`,'glowMetaAds','width=620,height=760');
+    if(!w) return Promise.reject(new Error('Facebook penceresi açılamadı. Açılır pencerelere izin verip tekrar dene.'));
+    return new Promise((res,rej)=>{
+      let done=false;
+      const finish=(fn,v)=>{ if(done) return; done=true; window.removeEventListener('message',onMsg); clearInterval(t); fn(v); };
+      const onMsg=e=>{
+        if(e.origin!==location.origin||!e.data||e.data.type!=='glow-meta-auth') return;
+        const h=new URLSearchParams(String(e.data.hash||'').replace(/^#/,'')), qs=new URLSearchParams(String(e.data.search||'').replace(/^\?/,''));
+        const get=k=>h.get(k)||qs.get(k);
+        if(get('state')!==state) return finish(rej,new Error('Güvenlik doğrulaması başarısız. Tekrar dene.'));
+        if(get('error')||get('error_code')) return finish(rej,new Error(get('error_reason')==='user_denied'||get('error')==='access_denied'?'Reklam izni verilmedi.':'Facebook girişi tamamlanamadı: '+(get('error_description')||get('error_message')||get('error'))));
+        const tok=get('access_token'); if(!tok) return finish(rej,new Error('Facebook’tan erişim anahtarı alınamadı.'));
+        const granted=(get('granted_scopes')||'').split(',').filter(Boolean);
+        if(granted.length&&!granted.includes('ads_read')) return finish(rej,new Error('Reklam verilerini okuma izni (ads_read) verilmedi.'));
+        finish(res,{token:tok,exp:Number(get('expires_in'))||0});
+      };
+      window.addEventListener('message',onMsg);
+      const t=setInterval(()=>{ if(w.closed) setTimeout(()=>finish(rej,new Error('Facebook penceresi kapatıldı.')),500); },700);
+    });
+  }
+  // Sunucuda META_APP_SECRET varsa kısa ömürlü anahtarı ~60 güne uzatır; yoksa sessizce kısa anahtarla devam eder.
+  async function maUzat(tok){
+    try{
+      const r=await fetch(apiBase()+'/api/meta-ads/exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok.token})});
+      if(!r.ok) return tok;
+      const j=await r.json(); return j.token?{token:j.token,exp:Number(j.expires_in)||60*86400,uzun:true}:tok;
+    }catch(e){ return tok; }
+  }
+  async function maApi(pathq,opts={}){
+    const tk=opts.token||appData.metaAds?.token; if(!tk) throw new Error('Meta Reklamları bağlı değil.');
+    try{ return await mApi(pathq,{...opts,token:tk}); }
+    catch(e){ if(/süresi doldu/.test(e.message)&&appData.metaAds){ appData.metaAds.hata='token'; save(); } throw e; }
+  }
+  async function maConnect(btn){
+    busy(btn,true,'Bağlanılıyor…');
+    try{
+      let tok=await maLogin();
+      busy(btn,true,'Hesaplar aranıyor…');
+      tok=await maUzat(tok);
+      const j=await mApi('me/adaccounts',{token:tok.token,params:{fields:'id,account_id,name,currency,account_status,business{name}',limit:'100'}});
+      MA.hesaplar=(j.data||[]).map(a=>({id:a.id,name:a.name||a.account_id,currency:a.currency||'TRY',durum:a.account_status,isletme:a.business?.name||''}));
+      MA.tok=tok; renderBaglantilar();
+    }catch(e){ toast(e.message,true); if(btn.isConnected) busy(btn,false); }
+  }
+  function maHesapKaydet(){
+    const h=MA.hesaplar&&MA.hesaplar[Number($('maHesapSec')?.value)]; if(!h||!MA.tok) return;
+    appData.metaAds={token:MA.tok.token,tokenExp:MA.tok.exp?Date.now()+MA.tok.exp*1000:0,uzun:!!MA.tok.uzun,adAccountId:h.id,adAccountName:h.name,currency:h.currency,bagliTarih:new Date().toISOString()};
+    MA.hesaplar=null; MA.tok=null; MA.ozet=null; MA.kampanyalar=null; save(); renderBaglantilar();
+    toast(`“${h.name}” reklam hesabı bağlandı.`); maYenile();
+  }
+  async function maDisconnect(){
+    if(!await confirmAsk({title:'Meta Reklamları bağlantısı kesilsin mi?',text:'Reklam hesabındaki kampanyalar etkilenmez; yalnızca bu uygulama erişimini kaybeder. İzni tamamen kaldırmak için Facebook → Ayarlar → İşletme entegrasyonları’ndan Glow’u kaldırabilirsin.',ok:'Bağlantıyı kes',danger:true})) return;
+    appData.metaAds=null; MA.ozet=null; MA.kampanyalar=null; MA.taslak=null; save(); renderBaglantilar(); toast('Meta Reklamları bağlantısı kesildi.');
+  }
+  async function maYenile(){
+    if(!maConnected()||MA.yukleniyor) return;
+    const a=appData.metaAds; MA.yukleniyor=true; MA.hata=''; renderBaglantilar();
+    try{
+      const [oz,kp]=await Promise.all([
+        maApi(`${a.adAccountId}/insights`,{params:{fields:'spend,impressions,reach,clicks,ctr,cpc',date_preset:MA.donem}}),
+        maApi(`${a.adAccountId}/campaigns`,{params:{fields:`id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,insights.date_preset(${MA.donem}){spend,impressions,clicks}`,limit:'25'}})
+      ]);
+      MA.ozet=(oz.data||[])[0]||{}; MA.kampanyalar=kp.data||[];
+      a.sonSenk=new Date().toISOString(); if(a.hata){ delete a.hata; } save();
+    }catch(e){ MA.hata=e.message; }
+    finally{ MA.yukleniyor=false; if(current==='baglantilar') renderBaglantilar(); }
+  }
+  function maPara(v,cur){ const n=Number(v||0); try{ return n.toLocaleString('tr-TR',{style:'currency',currency:cur||'TRY',maximumFractionDigits:2}); }catch(e){ return n.toFixed(2)+' '+(cur||''); } }
+  function maSayi(v){ return Number(v||0).toLocaleString('tr-TR'); }
+  function maButce(c,cur){ const v=c.daily_budget||c.lifetime_budget; if(!v) return 'Bütçe reklam setinde'; const off=MA_KURUSSUZ.includes(cur)?1:100; return maPara(Number(v)/off,cur)+(c.daily_budget?' / gün':' toplam'); }
+  // Öne çıkarılabilir gönderiler: Meta'da yayınlanmış içerikler (Facebook gönderisi ya da Instagram medyası)
+  function maGonderiler(){
+    const out=[];
+    (appData.icerikler||[]).forEach((c,i)=>{ ['facebook','instagram'].forEach(pf=>{ const y=c.yayinlar?.[pf]; if(y&&y.id) out.push({i,pf,id:String(y.id),tarih:y.tarih,metin:String(c.metin||'').slice(0,70)}); }); });
+    return out.sort((a,b)=>String(b.tarih).localeCompare(String(a.tarih))).slice(0,30);
+  }
+  function maCard(){
+    const a=appData.metaAds, mmok=mConnected();
+    let body;
+    if(MA.hesaplar){
+      body=MA.hesaplar.length
+        ?`<div class="field"><label for="maHesapSec">Hangi reklam hesabı?</label><select id="maHesapSec">${MA.hesaplar.map((h,k)=>`<option value="${k}">${esc(h.name)} · ${esc(h.currency)}${h.isletme?' — '+esc(h.isletme):''}${h.durum!==1?' ('+esc(MA_HESAP_DURUM[h.durum]||'durum '+h.durum)+')':''}</option>`).join('')}</select><span class="hint">Business Manager’da bu hesapta en az “Reklamveren” yetkin olmalı.</span></div>
+          <div class="actions"><button class="btn btn-primary btn-sm" data-action="ma-save">Bu hesabı bağla</button><button class="btn btn-quiet btn-sm" data-action="ma-cancel">Vazgeç</button></div>`
+        :`<p class="muted" style="font-size:14px">Bu Facebook hesabının erişebildiği bir reklam hesabı bulunamadı. Meta Business Suite → Ayarlar → Reklam hesapları’ndan hesap oluştur ya da kendine yetki ver.</p><div><button class="btn btn-ghost btn-sm" data-action="ma-cancel">Geri</button></div>`;
+    }else if(maConnected()){
+      const o=MA.ozet, cur=a.currency, act=String(a.adAccountId).replace(/^act_/,'');
+      const tiles=o?[['Harcama',maPara(o.spend,cur)],['Gösterim',maSayi(o.impressions)],['Tıklama',maSayi(o.clicks)],['TO (CTR)',o.ctr?Number(o.ctr).toLocaleString('tr-TR',{maximumFractionDigits:2})+' %':'—'],['TBM (CPC)',o.cpc?maPara(o.cpc,cur):'—']]:[];
+      const kamp=MA.kampanyalar;
+      const gon=maGonderiler(), t=MA.taslak;
+      body=`<div class="conn-loc"><strong>${esc(a.adAccountName)}</strong><span>Reklam hesabı · ${esc(cur)}${a.uzun?'':' · kısa süreli oturum'}</span></div>
+        ${maExpired()?'<p class="warn-line">Reklam bağlantısının süresi dolmuş. Yeniden bağlan.</p>':''}
+        <div class="seg" id="maDonem" role="group" aria-label="Dönem">${Object.entries(MA_DONEM).map(([k,v])=>`<button type="button" data-v="${k}" data-action="ma-donem" class="${MA.donem===k?'on':''}">${v}</button>`).join('')}</div>
+        ${MA.yukleniyor?'<p class="hint">Meta’dan veriler alınıyor…</p>':MA.hata?`<p class="warn-line">${esc(MA.hata)}</p>`:o?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px">${tiles.map(([k,v])=>`<div class="conn-loc" style="padding:10px 12px"><span style="font-size:12px">${k}</span><strong style="font-size:15px">${v}</strong></div>`).join('')}</div>${Number(o.impressions||0)===0?'<p class="hint">Bu dönemde yayında reklam yok.</p>':''}`:''}
+        ${kamp?`<div><h4 style="font-size:14px;font-weight:800;margin:4px 0 6px">Kampanyalar</h4>${kamp.length?`<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px">${kamp.map(c=>{ const ins=c.insights?.data?.[0]; const st=c.effective_status||c.status; return `<li class="conn-loc" style="padding:10px 12px"><strong style="font-size:14px">${esc(c.name)}</strong><span>${esc(MA_KAMP_DURUM[st]||st)} · ${esc(maButce(c,cur))}${ins?` · ${maPara(ins.spend,cur)} harcama · ${maSayi(ins.clicks)} tıklama`:''}</span></li>`; }).join('')}</ul>`:'<p class="hint">Bu hesapta kampanya yok.</p>'}</div>`:''}
+        <div class="actions"><button class="btn btn-primary btn-sm" data-action="ma-refresh">${ic('refresh')}Yenile</button><a class="btn btn-ghost btn-sm" href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${esc(act)}" target="_blank" rel="noopener">Ads Manager’da aç</a><button class="btn btn-ghost btn-sm" data-action="ma-connect">${maExpired()?'Yeniden bağlan':'Hesabı değiştir'}</button><button class="btn btn-quiet btn-sm" data-action="ma-disconnect" style="color:var(--bad)">Bağlantıyı kes</button></div>
+        <div style="border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px">
+          <h4 style="font-size:14px;font-weight:800;margin:0">Gönderiyi öne çıkar (taslak)</h4>
+          ${t&&t.adId?`<p class="hint" style="color:var(--ink-2)"><b>Taslak hazır:</b> “${esc(t.ad)}” kampanyası <b>duraklatılmış</b> olarak oluşturuldu. Harcama başlamaz; incelemek ve yayına almak için <a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${esc(act)}&selected_campaign_ids=${esc(t.campaignId)}" target="_blank" rel="noopener" style="color:var(--accent-ink);font-weight:700">Ads Manager</a>’ı aç.</p>`:''}
+          ${t&&t.hata?`<p class="warn-line">${esc(t.hata)}</p>`:''}
+          ${!mmok?'<p class="hint">Öne çıkarmak için önce Instagram ve Facebook kartından sayfanı bağla ve bir gönderi yayınla.</p>':!gon.length?'<p class="hint">Henüz Glow’dan Facebook ya da Instagram’da yayınlanmış bir gönderi yok. İçerik takviminden bir gönderi yayınla, burada görünsün.</p>':`
+          <div class="field"><label for="maGonderi">Gönderi</label><select id="maGonderi">${gon.map((g,k)=>`<option value="${k}">${g.pf==='instagram'?'Instagram':'Facebook'} · ${esc(tarihFmt(g.tarih))} · ${esc(g.metin||'(metinsiz)')}</option>`).join('')}</select></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
+            <div class="field"><label for="maButce">Günlük bütçe (${esc(cur)})</label><input id="maButce" type="number" inputmode="decimal" min="1" step="1" value="${esc(String(t?.butce||100))}"></div>
+            <div class="field"><label for="maGun">Süre (gün)</label><input id="maGun" type="number" inputmode="numeric" min="1" max="30" value="${esc(String(t?.gun||7))}"></div>
+            <div class="field"><label for="maYasMin">Yaş (en az)</label><input id="maYasMin" type="number" inputmode="numeric" min="18" max="65" value="${esc(String(t?.yasMin||18))}"></div>
+            <div class="field"><label for="maYasMax">Yaş (en çok)</label><input id="maYasMax" type="number" inputmode="numeric" min="18" max="65" value="${esc(String(t?.yasMax||65))}"></div>
+          </div>
+          <p class="hint">Hedef: Türkiye · etkileşim kampanyası. Kampanya, reklam seti ve reklam <b>DURAKLATILMIŞ</b> oluşturulur; Glow asla reklam yayınlamaz ve bütçe harcatmaz. Yayına almak Ads Manager’da senin kararın. Reklamlar Meta’nın reklam politikalarına göre incelenir.</p>
+          <div><button class="btn btn-primary btn-sm" data-action="ma-boost">Duraklatılmış taslak oluştur</button></div>`}
+        </div>`;
+    }else{
+      body=`<p class="muted" style="font-size:14px">Reklam hesabını bağladığında son 7/30 günün harcama, gösterim, tıklama, TO ve TBM özetini burada görürsün; yayınladığın bir gönderiyi tek tıkla <b>duraklatılmış taslak</b> kampanyaya çevirirsin.</p>
+        <p class="hint">Bu, sayfa bağlantısından ayrı bir izindir (ads_read, ads_management, business_management). Glow hiçbir zaman reklamı kendisi yayına almaz.</p>
+        <div><button class="btn btn-primary" data-action="ma-connect"${mAppId()?'':' disabled title="Önce Meta Uygulama Kimliğini gir"'}><span style="font-weight:800">f</span>Reklam hesabını bağla</button></div>
+        ${mAppId()?'':'<p class="hint">Önce yukarıdaki Instagram ve Facebook kartında Meta Uygulama Kimliğini gir.</p>'}
+        <details><summary class="hint" style="cursor:pointer;font-weight:700">Yönetici kurulumu (bir kerelik)</summary><ol class="steps" style="margin-top:8px">
+          <li><span>Meta for Developers’ta aynı uygulamaya <b>Marketing API</b> ürününü ekle.</span></li>
+          <li><span>App Review’da <code>${MA_SCOPES.join(', ')}</code> için Advanced Access iste; onaya kadar yalnızca uygulamada rolü olan hesaplar bağlanabilir.</span></li>
+          <li><span>İsteğe bağlı: sunucunun <code>.env</code> dosyasına <code>META_APP_ID</code> ve <code>META_APP_SECRET</code> yazarsan bağlantı 1-2 saat yerine ~60 gün geçerli olur.</span></li>
+        </ol></details>`;
+    }
+    const on=maConnected()&&!maExpired();
+    return `<div class="card conn-card" id="maKart">
+      <div class="conn-head"><div class="conn-logo m">${ic('bolt')}</div><div><h3>Meta Reklamları</h3><p>Reklam hesabı özeti ve taslak kampanyalar</p></div>
+        <span class="conn-status ${on?'on':'off'}"><i class="ai-dot"></i>${maConnected()?(maExpired()?'Yeniden bağlan':'Bağlı'):'Bağlı değil'}</span></div>
+      ${body}
+    </div>`;
+  }
+  async function maBoost(btn){
+    if(!maConnected()) return;
+    const a=appData.metaAds, m=appData.meta, g=maGonderiler()[Number($('maGonderi')?.value)];
+    const butce=Number($('maButce').value), gun=Math.round(Number($('maGun').value)), yasMin=Math.round(Number($('maYasMin').value)), yasMax=Math.round(Number($('maYasMax').value));
+    if(!g) return toast('Bir gönderi seç.',true);
+    if(!(butce>=1&&butce<=1000000)) return toast('Geçerli bir günlük bütçe gir.',true);
+    if(!(gun>=1&&gun<=30)) return toast('Süre 1-30 gün olmalı.',true);
+    if(!(yasMin>=18&&yasMax<=65&&yasMin<=yasMax)) return toast('Yaş aralığı 18-65 arasında olmalı.',true);
+    if(g.pf==='instagram'&&!m?.igId) return toast('Instagram hesabı bağlı değil.',true);
+    MA.taslak={butce,gun,yasMin,yasMax};
+    const ok=await confirmAsk({title:'Duraklatılmış taslak oluşturulsun mu?',text:`${a.adAccountName} hesabında, günlük ${maPara(butce,a.currency)} bütçeli, ${gun} günlük bir etkileşim kampanyası DURAKLATILMIŞ olarak oluşturulacak. Sen Ads Manager’da yayına almadıkça hiçbir ücret oluşmaz.`,ok:'Taslağı oluştur',check:'Kampanyanın duraklatılmış oluşturulacağını ve yayına alırsam Meta reklam politikalarına uymaktan sorumlu olduğumu anlıyorum.'});
+    if(!ok) return;
+    const off=MA_KURUSSUZ.includes(a.currency)?1:100, act=a.adAccountId;
+    const tarih=new Date().toLocaleDateString('tr-TR'), ad=`Glow · ${g.pf==='instagram'?'Instagram':'Facebook'} gönderisi · ${tarih}`;
+    const bas=new Date(Date.now()+3600e3), bit=new Date(bas.getTime()+gun*86400e3);
+    busy(btn,true,'Kampanya oluşturuluyor…');
+    let campaignId='';
+    try{
+      // 1) Kampanya — her zaman PAUSED
+      const c=await maApi(`${act}/campaigns`,{method:'POST',params:{name:ad,objective:'OUTCOME_ENGAGEMENT',status:'PAUSED',special_ad_categories:'[]',buying_type:'AUCTION',is_adset_budget_sharing_enabled:'false'}});
+      campaignId=c.id;
+      busy(btn,true,'Reklam seti hazırlanıyor…');
+      // 2) Reklam seti — PAUSED; bütçe hesabın para biriminin alt birimiyle
+      const s=await maApi(`${act}/adsets`,{method:'POST',params:{name:ad+' · set',campaign_id:campaignId,status:'PAUSED',daily_budget:String(Math.round(butce*off)),billing_event:'IMPRESSIONS',optimization_goal:'POST_ENGAGEMENT',destination_type:'ON_POST',bid_strategy:'LOWEST_COST_WITHOUT_CAP',start_time:bas.toISOString(),end_time:bit.toISOString(),
+        targeting:JSON.stringify({geo_locations:{countries:['TR']},age_min:yasMin,age_max:yasMax,targeting_automation:{advantage_audience:0}})}});
+      busy(btn,true,'Reklam hazırlanıyor…');
+      // 3) Kreatif — mevcut gönderi (Facebook: object_story_id, Instagram: source_instagram_media_id)
+      const kp=g.pf==='instagram'
+        ?{name:ad,object_id:m.pageId,instagram_user_id:m.igId,source_instagram_media_id:g.id}
+        :{name:ad,object_story_id:g.id.includes('_')?g.id:`${m.pageId}_${g.id}`};
+      const cr=await maApi(`${act}/adcreatives`,{method:'POST',params:kp});
+      // 4) Reklam — PAUSED
+      const r=await maApi(`${act}/ads`,{method:'POST',params:{name:ad,adset_id:s.id,creative:JSON.stringify({creative_id:cr.id}),status:'PAUSED'}});
+      MA.taslak={...MA.taslak,ad,campaignId,adId:r.id};
+      toast('Duraklatılmış taslak kampanya oluşturuldu.');
+      maYenile();
+    }catch(e){
+      MA.taslak={...MA.taslak,hata:e.message+(campaignId?' Yarım kalan duraklatılmış kampanya Ads Manager’da duruyor; silebilirsin.':'')};
+      toast(e.message,true);
+    }finally{ if(btn.isConnected) busy(btn,false); renderBaglantilar(); }
+  }
+  document.addEventListener('click',e=>{
+    const el=e.target.closest('[data-action^="ma-"]'); if(!el) return;
+    switch(el.dataset.action){
+      case 'ma-connect': MA.hesaplar=null; maConnect(el); break;
+      case 'ma-cancel': MA.hesaplar=null; MA.tok=null; renderBaglantilar(); break;
+      case 'ma-save': maHesapKaydet(); break;
+      case 'ma-disconnect': maDisconnect(); break;
+      case 'ma-refresh': maYenile(); break;
+      case 'ma-donem': if(MA.donem!==el.dataset.v){ MA.donem=el.dataset.v; MA.ozet=null; MA.kampanyalar=null; maYenile(); } break;
+      case 'ma-boost': maBoost(el); break;
+    }
+  });
+
   /* ---------- Bağlantılar sayfası ---------- */
   function renderBaglantilar(){
     const el=$('baglantiIcerik'); if(!el) return;
@@ -2693,6 +2893,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
             <span class="conn-status ${mConnected()&&mm.hata!=='token'?'on':'off'}"><i class="ai-dot"></i>${mConnected()?(mm.hata==='token'?'Yeniden bağlan':'Bağlı'):'Bağlı değil'}</span></div>
           ${mBody}
         </div>
+        ${maCard()}
         <div class="card conn-card">
           <div class="conn-head"><div class="conn-logo ai">${ic('cpu')}</div><div><h3>Yapay zekâ sunucusu</h3><p>DeepSeek ajanları · API anahtarı burada tutulur</p></div>
             <span class="conn-status ${AI.on?'on':'off'}"><i class="ai-dot"></i>${AI.on?esc(AI.model||'Açık'):'Şablon modu'}</span></div>
