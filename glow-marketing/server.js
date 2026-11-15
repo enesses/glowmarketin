@@ -591,6 +591,11 @@ const server = http.createServer(async (req, res) => {
         res.end(data);
       });
     }
+    // X (Twitter) bağlantısı — ayrıntılar x-api.js
+    if (url.pathname.startsWith('/api/x/')) {
+      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+      return await require('./x-api').handle(req, res, url, { send, readBody, limited, ip });
+    }
     if (url.pathname === '/api/agent') {
       if (req.method !== 'POST') return send(res, 405, { error: 'Yalnızca POST.' });
       const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
