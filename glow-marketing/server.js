@@ -636,7 +636,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/api/meta-ads/exchange') {
       if (req.method !== 'POST') return send(res, 405, { error: 'Yalnızca POST.' });
-      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+      const ip = clientIp(req);
       if (limited(ip)) return send(res, 429, { error: 'Çok fazla istek. Bir dakika sonra tekrar dene.' });
       return send(res, 200, await metaAdsExchange(await readBody(req, 4 * 1024)));
     }
@@ -677,7 +677,7 @@ const server = http.createServer(async (req, res) => {
     }
     // X (Twitter) bağlantısı — ayrıntılar x-api.js
     if (url.pathname.startsWith('/api/x/')) {
-      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+      const ip = clientIp(req);
       return await require('./x-api').handle(req, res, url, { send, readBody, limited, ip });
     }
     if (url.pathname === '/api/agent') {
