@@ -5,5 +5,7 @@
 ## Yapılanlar
 - localStorage sağlamlığı: `sanitize()` eklendi; bozuk/eski veri (yanlış tür diziler, metin kredi, geçersiz paket, sayısal işletme adı, SSS metin vb.) artık uygulamayı çökertmiyor. Test: `otomasyon/testler/arayuz-depolama.mjs`.
 
+- Mobil (360 px) yatay taşma giderildi: tek sütun düzenlerde `1fr` → `minmax(0,1fr)` (İşletme formu, Yorumlar).
+- Türkçe ek hatası: paket düğmeleri "Go’e/Plus’e geç" → "Go’ya/Plus’a/Max’e geç". Mobilde yanlış yönlendiren "Soldan …" ifadeleri düzeltildi.
+
 ## Kalanlar
-- Mobil (360 px) yatay taşma: İşletme formu ve Yorumlar özeti.

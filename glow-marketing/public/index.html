@@ -471,7 +471,7 @@ input[readonly],textarea[readonly]{background:var(--surface-2);color:var(--ink-2
   .v-grid{grid-template-columns:1fr}
   .conn-grid{grid-template-columns:1fr}
   .stats{grid-template-columns:repeat(2,1fr)}
-  .dash-grid,.rev-layout,.ask-layout,.biz-layout{grid-template-columns:1fr}
+  .dash-grid,.rev-layout,.ask-layout,.biz-layout{grid-template-columns:minmax(0,1fr)}
   .summary{position:static}
   .plans{grid-template-columns:1fr}
   .usage{grid-template-columns:1fr 1fr}
@@ -503,7 +503,7 @@ input[readonly],textarea[readonly]{background:var(--surface-2);color:var(--ink-2
   .hero{padding:24px}
 }
 @media (max-width:560px){
-  .grid-2{grid-template-columns:1fr}
+  .grid-2{grid-template-columns:minmax(0,1fr)}
   .stats{grid-template-columns:1fr 1fr;gap:10px}
   .stat{padding:16px}
   .stat-value{font-size:30px}
@@ -2586,7 +2586,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
             <div class="v-progress"><i></i></div>
             <span class="hint">Geçen süre: ${sureFmt(Date.now()-new Date(j.tarih).getTime())}. Sayfayı kapatsan da üretim devam eder.</span>
           </article>`;
-        }).join(''):`<div class="empty"><div class="empty-icon">${ic('film')}</div><h4>Henüz video yok</h4><p>Soldan bir fikir yaz, senaryoyu hazırla ve ilk videonu üret.</p></div>`}</div>
+        }).join(''):`<div class="empty"><div class="empty-icon">${ic('film')}</div><h4>Henüz video yok</h4><p>Bir fikir yaz, senaryoyu hazırla ve ilk videonu üret.</p></div>`}</div>
       </div>
     </div>`;
     renderAI();
@@ -2795,7 +2795,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     $('musteriOneri').innerHTML=[...new Set(sug)].slice(0,5).map(s=>`<button type="button" data-action="suggest" data-q="${esc(s)}">${esc(s)}</button>`).join('');
     $('musteriSonuc').innerHTML = gecmis.length
       ? `<div class="thread">${gecmis.map((g,k)=>`<div class="bubble-q">${esc(g.q)}</div><div class="bubble-a"><p>${esc(g.a)}</p><div class="bubble-meta"><span class="src">${esc(g.src)}</span><button class="btn btn-ghost btn-sm" data-action="copy-answer" data-k="${k}">${ic('copy')}Kopyala</button></div></div>`).join('')}</div>`
-      : `<div class="empty"><div class="empty-icon">${ic('chat')}</div><h4>Yanıtlar burada görünecek</h4><p>Soldan bir müşteri sorusu yaz veya hızlı denemelerden birini seç.</p></div>`;
+      : `<div class="empty"><div class="empty-icon">${ic('chat')}</div><h4>Yanıtlar burada görünecek</h4><p>Bir müşteri sorusu yaz veya hızlı denemelerden birini seç.</p></div>`;
   }
   const KAYNAK={sss:'DeepSeek · SSS’ye dayanarak',bilgi:'DeepSeek · işletme bilgilerine dayanarak',yok:'DeepSeek · bilgi bulunamadı, SSS’ye eklemeyi düşün'};
   $('btnMusteriYanitHazirla').onclick=()=>{
@@ -2874,7 +2874,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
         <div class="plan-name">${k}${cur?'<span class="plan-pill">Mevcut</span>':k==='Plus'?'<span class="tag">Popüler</span>':''}</div>
         <div class="plan-price">${p.fiyat}$<small> / ay</small></div>
         <ul>${p.ozellik.map(f=>`<li>${ic('check')}${f}</li>`).join('')}</ul>
-        ${cur?`<button class="btn btn-ghost btn-block" data-action="choose-plan" data-plan="${k}">Kredileri yenile</button>`:`<button class="btn ${k==='Plus'?'btn-primary':'btn-ghost'} btn-block" data-action="choose-plan" data-plan="${k}">${k}’e geç</button>`}
+        ${cur?`<button class="btn btn-ghost btn-block" data-action="choose-plan" data-plan="${k}">Kredileri yenile</button>`:`<button class="btn ${k==='Plus'?'btn-primary':'btn-ghost'} btn-block" data-action="choose-plan" data-plan="${k}">${({Go:'Go’ya',Plus:'Plus’a',Max:'Max’e'})[k]||k} geç</button>`}
       </div>`;}).join('');
     const p=PLANS[appData.paket]||PLANS.Plus;
     $('paketKredi').textContent=appData.kredi; $('paketKrediSub').textContent=`Aylık ${p.kredi} krediden`;
