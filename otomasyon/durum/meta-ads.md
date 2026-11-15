@@ -27,6 +27,7 @@ Son güncelleme: 15 Kas 2026, 1. dalga.
 - **Bütçe**: hesabın para birimine göre alt birim (kuruş); kuruşsuz para birimleri (JPY, KRW vb.) için çarpan 1.
 - `is_adset_budget_sharing_enabled=false` gönderiliyor (kampanya bütçesi yok, bütçe reklam setinde).
 - Reklam metni üretilmiyor (mevcut gönderi kullanılıyor), bu yüzden `meta-reklam-uzmani` skill'i yüklenmedi; arayüzde politika uyarısı var.
+- Ekleme noktaları (server.js yönlendirme, `.env.example`, Bağlantılar kartı) diğer ajan dallarıyla (`arayuz`, `sunucu`, `x`) `git merge-tree` ile çakışmasız olacak şekilde seçildi (15:15 itibarıyla). Kart, Google kartının hemen altında.
 - Çerez bandı test sırasında tıklamayı engelliyordu — arayüz ajanının alanı, dokunulmadı.
 
 ## Kullanıcının yapması gerekenler
