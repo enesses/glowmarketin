@@ -932,6 +932,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
 <tr><td>Google LLC</td><td>Google İşletme Profili bağlantısı, Google ile oturum açma, yazı tipleri</td><td>Bağlı işletme profilinin yorumları ve gönderileri, erişim belirteci, IP adresi ve tarayıcı bilgisi</td><td>ABD ve Google’ın veri merkezleri</td></tr>
 <tr><td>fal.ai (Features &amp; Labels, Inc.) veya OpenRouter, Inc. — ByteDance Seedance modeli</td><td>AI video üretimi (yalnızca Max paketi)</td><td>Video komutu ve, eklediyseniz, başlangıç fotoğrafı</td><td>ABD</td></tr>
 <tr><td>Meta Platforms Ireland Ltd. / Meta Platforms, Inc.</td><td>Facebook sayfası ve Instagram işletme hesabı bağlantısı: gönderi yayınlama, yorumları okuma ve yanıtlama</td><td>Bağlı sayfa ve Instagram hesabının gönderileri, gönderilere gelen yorumlar (yorum sahibinin görünen adı veya kullanıcı adı), erişim belirteci</td><td>İrlanda, ABD ve Meta’nın veri merkezleri</td></tr>
+<tr><td>X Corp.</td><td>X (Twitter) hesabı bağlantısı: gönderi paylaşma</td><td>Bağlı X hesabının kullanıcı adı ve görünen adı, paylaşmak istediğiniz gönderi metni, erişim belirteci (yalnızca tarayıcınızda saklanır)</td><td>ABD ve X’in veri merkezleri</td></tr>
 <tr><td><mark class="ph">[ÖDEME KURULUŞU]</mark></td><td>Abonelik ödemelerinin tahsili</td><td>Ad, e-posta, fatura bilgileri, ödeme işlem kayıtları (kart bilgileri bize ulaşmaz)</td><td>Türkiye</td></tr>
 </tbody></table></div>
 <p class="small">Yapay zekâ özelliklerini kullanmadığınızda DeepSeek’e, Google hesabınızı bağlamadığınızda Google İşletme Profili’ne, Facebook ve Instagram hesaplarınızı bağlamadığınızda Meta’ya veri gönderilmez.</p>
@@ -1023,6 +1024,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
 <tr><td>Google LLC</td><td>Google İşletme Profili bağlantısı, Google ile oturum açma, yazı tipleri</td><td>Bağlı işletme profilinin yorumları ve gönderileri, erişim belirteci, IP adresi ve tarayıcı bilgisi</td><td>ABD ve Google’ın veri merkezleri</td></tr>
 <tr><td>fal.ai (Features &amp; Labels, Inc.) veya OpenRouter, Inc. — ByteDance Seedance modeli</td><td>AI video üretimi (yalnızca Max paketi)</td><td>Video komutu ve, eklediyseniz, başlangıç fotoğrafı</td><td>ABD</td></tr>
 <tr><td>Meta Platforms Ireland Ltd. / Meta Platforms, Inc.</td><td>Facebook sayfası ve Instagram işletme hesabı bağlantısı: gönderi yayınlama, yorumları okuma ve yanıtlama</td><td>Bağlı sayfa ve Instagram hesabının gönderileri, gönderilere gelen yorumlar (yorum sahibinin görünen adı veya kullanıcı adı), erişim belirteci</td><td>İrlanda, ABD ve Meta’nın veri merkezleri</td></tr>
+<tr><td>X Corp.</td><td>X (Twitter) hesabı bağlantısı: gönderi paylaşma</td><td>Bağlı X hesabının kullanıcı adı ve görünen adı, paylaşmak istediğiniz gönderi metni, erişim belirteci (yalnızca tarayıcınızda saklanır)</td><td>ABD ve X’in veri merkezleri</td></tr>
 <tr><td><mark class="ph">[ÖDEME KURULUŞU]</mark></td><td>Abonelik ödemelerinin tahsili</td><td>Ad, e-posta, fatura bilgileri, ödeme işlem kayıtları (kart bilgileri bize ulaşmaz)</td><td>Türkiye</td></tr>
 </tbody></table></div>
 <p>Yasal bir zorunluluk olduğunda bilgileri yetkili makamlarla da paylaşabiliriz.</p>
@@ -1549,6 +1551,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
 })();
 
 </script>
+<script src="x.js"></script>
 <script>
 (function(){
   if(window.__GLOW_AUTH_POPUP) return;
@@ -1668,6 +1671,8 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
 
   /* ---------- AI (DeepSeek ajanları, sunucu üzerinden) ---------- */
   function apiBase(){ return String(window.GLOW_API_BASE||CONFIG.apiBase||appData.ayarlar?.apiBase||'').trim().replace(/\/+$/,''); }
+  const GX=window.GlowX||null; // X (Twitter) bağlantısı → x.js
+  if(GX) GX.init({apiBase,esc,ic,toast,confirmAsk,onChange:()=>{ if(document.getElementById('modalIcerikOverlay')?.classList.contains('open')) updateIcerikGoogleUI(); }});
   const AI={on:false,model:''};
   async function checkAI(){
     if(location.protocol==='file:'&&!apiBase()){ AI.on=false; return renderAI(); }
@@ -1864,13 +1869,13 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     openModal('modalIcerikOverlay');
   }
   const LIMIT={google:1500,instagram:2200,facebook:5000,x:280};
-  const YAYIN_ETIKET={google:'Google’da yayınla',instagram:'Instagram’da yayınla',facebook:'Facebook’ta yayınla'};
+  const YAYIN_ETIKET={google:'Google’da yayınla',instagram:'Instagram’da yayınla',facebook:'Facebook’ta yayınla',x:'X’te paylaş'};
   let icerikGorsel='', icerikVideo='', gorselYukleniyor=false;
   function updateIcerikGoogleUI(){
-    const pf=segVal($('modalIcerikPlatform')), len=$('modalIcerikMetin').value.trim().length, lim=LIMIT[pf];
+    const pf=segVal($('modalIcerikPlatform')), len=pf==='x'&&GX?GX.weightedLength($('modalIcerikMetin').value.trim()):$('modalIcerikMetin').value.trim().length, lim=LIMIT[pf];
     const c=editIcerikIdx!==null?appData.icerikler[editIcerikIdx]:null;
     const btn=$('btnModalIcerikYayinla');
-    btn.classList.toggle('hidden',!YAYIN_ETIKET[pf]);
+    btn.classList.toggle('hidden',!YAYIN_ETIKET[pf]||(pf==='x'&&!GX));
     if(YAYIN_ETIKET[pf]&&!btn.classList.contains('loading')) btn.lastChild.textContent=YAYIN_ETIKET[pf];
     const sayac=$('icerikSayac'); sayac.textContent=lim?`${len} / ${lim}`:''; sayac.classList.toggle('over',!!lim&&len>lim);
     let not='';
@@ -1882,7 +1887,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       else if(pf==='instagram'&&!appData.meta.igId) not='Bağlı Facebook sayfasına bağlı bir Instagram işletme hesabı yok.';
       else not=pf==='instagram'?`@${appData.meta.igUsername} hesabında yayınlanır. Instagram için görsel ya da video zorunlu.`:`“${appData.meta.pageName}” sayfasında yayınlanır. Görsel isteğe bağlı.`;
     }
-    else if(pf==='x') not='X için metni kopyalayıp uygulamada paylaşabilirsin.';
+    else if(pf==='x') not=!GX?'X için metni kopyalayıp uygulamada paylaşabilirsin.':c?.yayinlar?.x?`X’te paylaşıldı · ${tarihFmt(c.yayinlar.x.tarih)}. Aynı metni tekrar paylaşmak X’te reddedilebilir.`:GX.connected()?`@${GX.username()} hesabında paylaşılır. En fazla 280 karakter; bağlantılar 23, emoji 2 sayılır.`:GX.expired()?'X bağlantısının süresi dolmuş. Bağlantılar sayfasından yeniden bağlan.':'X’te paylaşmak için Bağlantılar sayfasından X hesabını bağla.';
     $('icerikGoogleNot').textContent=not;
     const gAlan=$('gorselAlan'); gAlan.classList.toggle('hidden',!(pf==='instagram'||pf==='facebook'));
     renderGorselKutu(pf);
@@ -1948,6 +1953,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   $('btnModalIcerikYayinla').onclick=async()=>{
     const pf=segVal($('modalIcerikPlatform'));
     if(pf==='instagram'||pf==='facebook') return metaYayinlaModal(pf);
+    if(pf==='x') return xYayinlaModal();
     const metin=$('modalIcerikMetin').value.trim();
     if(!metin) return toast('Yayınlamak için içerik metni gerekli.',true);
     if(metin.length>1500) return toast('Google gönderileri en fazla 1500 karakter olabilir.',true);
@@ -2305,6 +2311,22 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   async function mDisconnect(){
     if(!await confirmAsk({title:'Meta bağlantısı kesilsin mi?',text:'Çekilmiş yorumlar uygulamada kalır; Instagram ve Facebook’ta yayınlama durur. İzni tamamen kaldırmak için Facebook → Ayarlar → İşletme entegrasyonları’ndan Glow’u kaldırabilirsin.',ok:'Bağlantıyı kes',danger:true})) return;
     MG.pages=null; appData.meta=null; save(); renderAll(); renderBaglantilar(); toast('Meta bağlantısı kesildi.');
+  }
+  async function xYayinlaModal(){
+    const metin=$('modalIcerikMetin').value.trim(), btn=$('btnModalIcerikYayinla');
+    if(!GX||btn.classList.contains('loading')) return;
+    if(!GX.connected()){ toast(GX.expired()?'X bağlantısının süresi dolmuş. Yeniden bağlan.':'Önce X hesabını bağla.',true); closeModal(); return go('baglantilar'); }
+    if(!metin) return toast('X’te paylaşmak için metin gerekli.',true);
+    const n=GX.weightedLength(metin); if(n>GX.MAX) return toast(`X gönderisi en fazla ${GX.MAX} karakter olabilir (şu an ${n}).`,true);
+    if(/\[[^\]]{2,}\]/.test(metin)) return toast('Metinde doldurulmamış [yer tutucu] var. Önce onu düzenle.',true);
+    if(!await confirmAsk({title:'X’te paylaşılsın mı?',text:`Bu gönderi @${GX.username()} hesabında herkese açık olarak paylaşılacak.`,ok:'Paylaş'})) return;
+    const idx=saveIcerik(false); if(idx===null) return;
+    busy(btn,true,'Paylaşılıyor…');
+    try{
+      const r=await GX.publish(metin), c=appData.icerikler[idx];
+      if(c){ c.yayinlar={...(c.yayinlar||{}),x:{id:r.id,tarih:new Date().toISOString(),url:r.url}}; save(); }
+      busy(btn,false); toast('X’te paylaşıldı.'); closeModal(); renderAll();
+    }catch(e){ busy(btn,false); toast(e.message,true); if(e.status===401) updateIcerikGoogleUI(); }
   }
   async function metaYayinlaModal(pf){
     const metin=$('modalIcerikMetin').value.trim(), ad=pf==='instagram'?'Instagram':'Facebook';
@@ -2746,6 +2768,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
             <span class="conn-status ${mConnected()&&mm.hata!=='token'?'on':'off'}"><i class="ai-dot"></i>${mConnected()?(mm.hata==='token'?'Yeniden bağlan':'Bağlı'):'Bağlı değil'}</span></div>
           ${mBody}
         </div>
+        ${GX?GX.card():''}
         <div class="card conn-card">
           <div class="conn-head"><div class="conn-logo ai">${ic('cpu')}</div><div><h3>Yapay zekâ sunucusu</h3><p>DeepSeek ajanları · API anahtarı burada tutulur</p></div>
             <span class="conn-status ${AI.on?'on':'off'}"><i class="ai-dot"></i>${AI.on?esc(AI.model||'Açık'):'Şablon modu'}</span></div>
