@@ -12,8 +12,9 @@ const PORT = Number(process.env.PORT || 3000);
 const KEY = process.env.DEEPSEEK_API_KEY || '';
 const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 const BASE = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
-const RATE = Number(process.env.RATE_LIMIT_PER_MIN || 20);
+const RATE = Math.max(1, Number(process.env.RATE_LIMIT_PER_MIN) || 20);
 const PUBLIC = path.join(__dirname, 'public');
+const VERSION = (() => { try { return require('./package.json').version; } catch (_) { return '?'; } })();
 // Site ya da mobil uygulama başka bir adresten çağırıyorsa izin verilen kaynaklar (virgülle).
 // Örn: https://glowmarketing.com,capacitor://localhost,http://localhost
 const ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean);
@@ -127,11 +128,13 @@ async function deepseek(messages, { json = false, max_tokens = 900, temperature 
       }),
     });
   } catch (e) {
-    throw httpErr(504, e.name === 'AbortError' ? 'DeepSeek zamanında yanıt vermedi.' : 'DeepSeek’e bağlanılamadı.');
-  } finally {
     clearTimeout(timer);
+    throw httpErr(504, e.name === 'AbortError' ? 'DeepSeek zamanında yanıt vermedi.' : 'DeepSeek’e bağlanılamadı.');
   }
-  const body = await r.text();
+  let body;
+  try { body = await r.text(); } // zaman aşımı gövde okunurken de geçerli
+  catch (_) { throw httpErr(504, 'DeepSeek zamanında yanıt vermedi.'); }
+  finally { clearTimeout(timer); }
   if (!r.ok) {
     let detail = '';
     try { detail = JSON.parse(body).error?.message || ''; } catch (_) {}
@@ -145,7 +148,8 @@ async function deepseek(messages, { json = false, max_tokens = 900, temperature 
     console.error(`[deepseek] ${r.status} ${detail}`);
     throw httpErr(r.status >= 500 ? 502 : r.status, map[r.status] || 'DeepSeek şu an yanıt vermiyor.');
   }
-  const j = JSON.parse(body);
+  let j;
+  try { j = JSON.parse(body); } catch (_) { throw httpErr(502, 'DeepSeek geçersiz bir yanıt döndürdü.'); }
   const content = j.choices?.[0]?.message?.content || '';
   if (!content.trim()) throw httpErr(502, 'Yapay zekâ boş yanıt döndürdü.');
   return { text: content.trim(), usage: j.usage };
@@ -320,52 +324,77 @@ JSON biçimi: {"yanit":"...","kaynak":"sss|bilgi|yok"}`,
 /* ------------------------------------------------------------------ */
 /* HTTP sunucusu                                                       */
 /* ------------------------------------------------------------------ */
-const hits = new Map();
-function limited(ip) {
-  const now = Date.now();
-  const arr = (hits.get(ip) || []).filter((t) => now - t < 60000);
-  arr.push(now);
-  hits.set(ip, arr);
-  return arr.length > RATE;
+// İstemci IP'si. X-Forwarded-For yalnızca güvenilen vekil sayısı kadar sağdan okunur
+// (Render/Railway gibi tek vekil: TRUST_PROXY=1). Vekilsiz çalışırken TRUST_PROXY=0 ver;
+// aksi halde istemci başlığı sahteleyip hız sınırını aşabilir.
+const TRUST_PROXY = Math.max(0, Math.floor(Number(process.env.TRUST_PROXY ?? 1)) || 0);
+function clientIp(req) {
+  let ip = req.socket.remoteAddress || '';
+  if (TRUST_PROXY > 0) {
+    const xff = String(req.headers['x-forwarded-for'] || '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (xff.length) ip = xff[Math.max(0, xff.length - TRUST_PROXY)];
+  }
+  return ip.replace(/^::ffff:/, '').slice(0, 64) || 'bilinmiyor';
 }
 
+const hits = new Map();
+function limited(ip, max = RATE) { // dakikalık sınır; farklı kovalar için anahtara önek ver (örn. 'v:' + ip)
+  const now = Date.now();
+  const arr = (hits.get(ip) || []).filter((t) => now - t < 60000);
+  if (arr.length > max) { hits.set(ip, arr); return true; } // sınırdayken diziyi büyütme
+  arr.push(now);
+  hits.set(ip, arr);
+  return arr.length > max;
+}
+// Eski IP kayıtlarını temizle (bellek sızıntısını önler)
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, arr] of hits) if (!arr.length || now - arr[arr.length - 1] > 60000) hits.delete(ip);
+  for (const [ip, arr] of videoHits) if (!arr.length || now - arr[arr.length - 1] > 3600000) videoHits.delete(ip);
+}, 5 * 60000).unref();
+
 function send(res, status, obj) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
   res.end(JSON.stringify(obj));
 }
 
-function readBody(req, limit = 60 * 1024) {
+// Gövdeyi sınırlı oku. Sınır aşılınca okumayı bırakır (soketi hemen kesmez ki 413 yanıtı istemciye ulaşsın).
+function readLimited(req, limit, tooBig) {
   return new Promise((resolve, reject) => {
-    let size = 0; const chunks = [];
+    const len = Number(req.headers['content-length']);
+    if (len > limit) { req.resume(); return reject(httpErr(413, tooBig)); }
+    let size = 0, done = false; const chunks = [];
     req.on('data', (c) => {
+      if (done) return;
       size += c.length;
-      if (size > limit) { reject(httpErr(413, 'İstek çok büyük.')); req.destroy(); return; }
+      if (size > limit) { done = true; chunks.length = 0; req.resume(); return reject(httpErr(413, tooBig)); }
       chunks.push(c);
     });
-    req.on('end', () => {
-      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); }
-      catch (_) { reject(httpErr(400, 'Geçersiz JSON.')); }
-    });
-    req.on('error', reject);
+    req.on('end', () => { if (!done) { done = true; resolve(Buffer.concat(chunks)); } });
+    req.on('error', (e) => { if (!done) { done = true; reject(httpErr(400, 'İstek okunamadı.')); } });
   });
 }
 
+// Tarayıcının ön kontrol (preflight) yapmadan başka siteden gönderebildiği türler JSON uçlarında reddedilir (CSRF).
+const SIMPLE_TYPES = /^\s*(text\/plain|application\/x-www-form-urlencoded|multipart\/form-data)\b/i;
+async function readBody(req, limit = 60 * 1024) {
+  if (SIMPLE_TYPES.test(req.headers['content-type'] || '')) throw httpErr(415, 'İstek gövdesi application/json olmalı.');
+  const buf = await readLimited(req, limit, 'İstek çok büyük.');
+  let data;
+  try { data = JSON.parse(buf.toString('utf8') || '{}'); } catch (_) { throw httpErr(400, 'Geçersiz JSON.'); }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw httpErr(400, 'Geçersiz JSON.');
+  return data;
+}
+
 function readRaw(req, limit) {
-  return new Promise((resolve, reject) => {
-    let size = 0; const chunks = [];
-    req.on('data', (c) => {
-      size += c.length;
-      if (size > limit) { reject(httpErr(413, 'Görsel en fazla 8 MB olabilir.')); req.destroy(); return; }
-      chunks.push(c);
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
-  });
+  return readLimited(req, limit, 'Görsel en fazla 8 MB olabilir.');
 }
 
 function cleanUploads() {
   const now = Date.now();
-  for (const f of fs.readdirSync(UPLOADS)) {
+  let files = [];
+  try { files = fs.readdirSync(UPLOADS); } catch (e) { return console.error('[uploads] okunamadı:', e.message); }
+  for (const f of files) {
     const p = path.join(UPLOADS, f);
     try { if (now - fs.statSync(p).mtimeMs > MEDIA_TTL) fs.unlinkSync(p); } catch (_) {}
   }
@@ -376,14 +405,22 @@ setInterval(cleanUploads, 6 * 3600 * 1000).unref();
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json' };
 
 function serveStatic(req, res) {
-  let rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  let rel;
+  try { rel = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch (_) { rel = null; }
+  if (rel === null || rel.includes('\0')) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Geçersiz adres'); }
   if (rel === '/') rel = '/index.html';
   const file = path.normalize(path.join(PUBLIC, rel));
-  if (!file.startsWith(PUBLIC + path.sep)) { res.writeHead(403); return res.end('Yasak'); }
+  if (!file.startsWith(PUBLIC + path.sep)) { res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Yasak'); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Bulunamadı'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' });
-    res.end(data);
+    const ext = path.extname(file);
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      ...(ext === '.html' ? { 'X-Frame-Options': 'DENY', 'Cache-Control': 'no-cache' } : {}),
+    });
+    res.end(req.method === 'HEAD' ? undefined : data);
   });
 }
 
@@ -472,7 +509,12 @@ async function videoSubmit(b) {
 const videoDone = new Map(); // taskId -> yerel mp4 adresi (sunucu yeniden başlarsa dosya adından bulunur)
 function videoFileName(taskId) { return require('crypto').createHash('sha256').update(taskId).digest('hex').slice(0, 32) + '.mp4'; }
 
-async function saveVideo(taskId, srcUrl, headers) {
+const videoSaving = new Map(); // aynı görev için eşzamanlı yoklamalar videoyu iki kez indirmesin
+function saveVideo(taskId, srcUrl, headers) {
+  if (!videoSaving.has(taskId)) videoSaving.set(taskId, saveVideoOnce(taskId, srcUrl, headers).finally(() => videoSaving.delete(taskId)));
+  return videoSaving.get(taskId);
+}
+async function saveVideoOnce(taskId, srcUrl, headers) {
   const name = videoFileName(taskId), file = path.join(UPLOADS, name);
   if (!fs.existsSync(file)) {
     const r = await fetch(srcUrl, { headers, redirect: 'follow', signal: AbortSignal.timeout(180000) });
@@ -480,7 +522,7 @@ async function saveVideo(taskId, srcUrl, headers) {
     if (Number(r.headers.get('content-length')) > VIDEO_MAX) throw httpErr(502, 'Üretilen video çok büyük.');
     const buf = Buffer.from(await r.arrayBuffer());
     if (buf.length > VIDEO_MAX || buf.length < 1000) throw httpErr(502, 'Üretilen video geçersiz.');
-    fs.writeFileSync(file, buf);
+    fs.writeFileSync(file + '.tmp', buf); fs.renameSync(file + '.tmp', file); // yarım dosya "hazır" sanılmasın
     console.log(`[video] kaydedildi ${name} ${(buf.length / 1048576).toFixed(1)} MB`);
   }
   const u = `${PUBLIC_URL}/media/${name}`;
@@ -508,7 +550,9 @@ async function videoStatus(taskId) {
   if (st !== 'COMPLETED' && st !== 'completed') return { status: 'RUNNING', progress: st === 'IN_QUEUE' || st === 'pending' || st === 'queued' ? 0.1 : 0.5 };
   if (!PUBLIC_URL) throw httpErr(503, 'Sunucuda PUBLIC_URL tanımlı değil; video kaydedilemiyor.');
   if (provider === 'fal') {
-    const res2 = await fetch(base, { headers, redirect: 'error', signal: AbortSignal.timeout(45000) });
+    let res2;
+    try { res2 = await fetch(base, { headers, redirect: 'error', signal: AbortSignal.timeout(45000) }); }
+    catch (_) { return { status: 'RUNNING', progress: 0.9, retry: true }; }
     if ([400, 422].includes(res2.status)) return { status: 'FAILED', error: 'Sağlayıcı bu videoyu üretemedi (içerik reddedildi). Komutu değiştirip tekrar dene.' };
     if (!res2.ok) return { status: 'RUNNING', progress: 0.9, retry: true };
     data = await res2.json().catch(() => null);
@@ -532,10 +576,10 @@ function serveMp4(req, res, file) {
       if (isNaN(start) || start < 0 || start >= st.size || end < start) { res.writeHead(416, { 'Content-Range': `bytes */${st.size}` }); return res.end(); }
       end = Math.min(end, st.size - 1);
       res.writeHead(206, { ...common, 'Content-Range': `bytes ${start}-${end}/${st.size}`, 'Content-Length': end - start + 1 });
-      return fs.createReadStream(file, { start, end }).pipe(res);
+      return fs.createReadStream(file, { start, end }).on('error', () => res.destroy()).pipe(res);
     }
     res.writeHead(200, { ...common, 'Content-Length': st.size });
-    fs.createReadStream(file).pipe(res);
+    fs.createReadStream(file).on('error', () => res.destroy()).pipe(res); // dosya bu arada silinirse çökme
   });
 }
 
@@ -545,33 +589,35 @@ function cors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', o);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Max-Age', '86400');
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://x');
+  let url;
+  try { url = new URL(req.url, 'http://x'); } catch (_) { return send(res, 400, { error: 'Geçersiz adres.' }); }
   cors(req, res);
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   try {
     if (url.pathname === '/api/health' && req.method === 'GET') {
-      return send(res, 200, { ok: true, ai: Boolean(KEY), model: MODEL, ajanlar: Object.keys(AGENTS), media: Boolean(PUBLIC_URL), video: Boolean(videoProvider() && PUBLIC_URL), videoModel: VIDEO_MODEL });
+      return send(res, 200, { ok: true, surum: VERSION, calisma: Math.round(process.uptime()), ai: Boolean(KEY), model: MODEL, ajanlar: Object.keys(AGENTS), media: Boolean(PUBLIC_URL), video: Boolean(videoProvider() && PUBLIC_URL), videoModel: VIDEO_MODEL });
     }
     if (url.pathname === '/api/video' && req.method === 'POST') {
-      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+      const ip = clientIp(req);
       if (!PUBLIC_URL) return send(res, 503, { error: 'Sunucuda PUBLIC_URL tanımlı değil; video kaydedilemiyor.' });
       const body = await readBody(req);
       if (videoLimited(ip)) return send(res, 429, { error: 'Saatlik video sınırına ulaşıldı. Biraz sonra tekrar dene.' });
       return send(res, 200, await videoSubmit(body));
     }
     if (url.pathname.startsWith('/api/video/') && req.method === 'GET') {
+      if (limited('v:' + clientIp(req), 60)) return send(res, 429, { error: 'Çok fazla istek. Bir dakika sonra tekrar dene.' });
       return send(res, 200, await videoStatus(decodeURIComponent(url.pathname.slice(11))));
     }
     // Görsel yükleme (Instagram / Facebook gönderileri için). Gövde: ham JPEG, Content-Type: image/jpeg
     if (url.pathname === '/api/media') {
       if (req.method !== 'POST') return send(res, 405, { error: 'Yalnızca POST.' });
       if (!PUBLIC_URL) return send(res, 503, { error: 'Sunucuda PUBLIC_URL tanımlı değil; görsel yüklenemiyor.' });
-      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+      const ip = clientIp(req);
       if (limited(ip)) return send(res, 429, { error: 'Çok fazla istek. Bir dakika sonra tekrar dene.' });
       if (!/^image\/jpe?g$/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Yalnızca JPEG görsel kabul edilir.' });
       const buf = await readRaw(req, MEDIA_MAX);
@@ -598,10 +644,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/api/agent') {
       if (req.method !== 'POST') return send(res, 405, { error: 'Yalnızca POST.' });
-      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+      const ip = clientIp(req);
       if (limited(ip)) return send(res, 429, { error: 'Çok fazla istek. Bir dakika sonra tekrar dene.' });
       const body = await readBody(req);
-      const agent = AGENTS[body.agent];
+      const agent = typeof body.agent === 'string' && Object.hasOwn(AGENTS, body.agent) ? AGENTS[body.agent] : null;
       if (!agent) return send(res, 400, { error: 'Bilinmeyen ajan.' });
       const t0 = Date.now();
       const out = await agent(body);
@@ -612,14 +658,36 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET') return serveStatic(req, res);
     send(res, 404, { error: 'Bulunamadı.' });
   } catch (e) {
+    if (e instanceof URIError) e = httpErr(400, 'Geçersiz adres.');
     if (!e.status) console.error(e);
+    if (res.headersSent) return res.destroy();
+    if (e.status === 413) res.setHeader('Connection', 'close'); // okunmayan gövdeyi beklemeden bağlantıyı kapat
     send(res, e.status || 500, { error: e.status ? e.message : 'Sunucu hatası.' });
   }
+});
+
+// Yavaş istemciler bağlantı tutup sunucuyu yormasın
+server.headersTimeout = 20000;
+server.requestTimeout = 120000;
+
+process.on('unhandledRejection', (e) => console.error('[hata] yakalanmamış söz:', e));
+// Render/Railway yeniden başlatırken (SIGTERM) açık istekleri bitir, sonra çık
+for (const sig of ['SIGTERM', 'SIGINT']) process.once(sig, () => {
+  console.log(`[sunucu] ${sig} alındı, kapanıyor…`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 10000).unref();
+});
+
+server.on('error', (e) => {
+  console.error(e.code === 'EADDRINUSE' ? `HATA: ${PORT} numaralı port kullanımda. Başka bir PORT ver ya da çalışan sunucuyu kapat.` : e);
+  process.exit(1);
 });
 
 server.listen(PORT, () => {
   console.log(`Glow Marketing → http://localhost:${PORT}`);
   console.log(KEY ? `Yapay zekâ: açık (${MODEL})` : 'UYARI: DEEPSEEK_API_KEY yok — uygulama şablon modunda çalışacak.');
   const vp = videoProvider();
+  if (PUBLIC_URL && !/^https:\/\//.test(PUBLIC_URL)) console.log('UYARI: PUBLIC_URL https ile başlamıyor; Instagram görselleri ve videolar okunamayabilir.');
+  if (ORIGINS.includes('*')) console.log('UYARI: ALLOWED_ORIGINS=* — her site bu sunucunun yapay zekâ kredisini kullanabilir. Yalnızca kendi alan adlarını yaz.');
   console.log(vp && PUBLIC_URL ? `AI video: açık (${vp} · ${VIDEO_MODEL} · ${VIDEO_RES})` : 'AI video: kapalı (FAL_KEY veya OPENROUTER_API_KEY ve PUBLIC_URL gerekli)');
 });
