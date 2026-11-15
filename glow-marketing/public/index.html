@@ -1447,7 +1447,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 /* Meta giriş penceresi dönüşü: bu sayfa açılır pencerede yönlendirme adresi olarak açıldıysa sonucu ana pencereye iletip kapanır. */
@@ -1700,11 +1700,29 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   function copyText(t){ if(!t) return toast('Kopyalanacak metin yok.',true); (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Panoya kopyalandı.')).catch(()=>{ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); toast('Panoya kopyalandı.');}catch(e){toast('Kopyalanamadı.',true);} ta.remove(); }); }
 
   /* ---------- Modal ---------- */
-  let openModalEl=null;
-  function openModal(id){ const m=$(id); openModalEl=m; m.classList.add('open'); setTimeout(()=>{ if(!m.classList.contains('open')) return; const f=m.querySelector('input,textarea,select'); if(f&&window.innerWidth>700) f.focus(); },60); }
-  function closeModal(){ if(openModalEl){ openModalEl.classList.remove('open'); openModalEl=null; } }
+  let openModalEl=null, modalDonus=null;
+  const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  function odakla(m){ const f=m.querySelector('input:not([readonly]),textarea:not([readonly]),select')||m.querySelector(FOCUSABLE); if(f) f.focus({preventScroll:true}); }
+  function openModal(id){
+    const m=$(id); if(!openModalEl) modalDonus=document.activeElement; openModalEl=m; m.classList.add('open');
+    setTimeout(()=>{ if(!m.classList.contains('open')) return; if(window.innerWidth>700) odakla(m); else { const md=m.querySelector('.modal'); if(md){ md.setAttribute('tabindex','-1'); md.focus({preventScroll:true}); } } },60);
+  }
+  function closeModal(){
+    if(openModalEl){ openModalEl.classList.remove('open'); openModalEl=null; const d=modalDonus; modalDonus=null; if(d&&d.isConnected&&typeof d.focus==='function') try{ d.focus({preventScroll:true}); }catch(e){} }
+  }
   document.querySelectorAll('.backdrop').forEach(b=>b.addEventListener('mousedown',e=>{ if(e.target===b&&b.id!=='modalOnay') closeModal(); }));
-  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&openModalEl&&openModalEl.id!=='modalOnay') closeModal(); });
+  document.addEventListener('keydown',e=>{
+    const onay=$('modalOnay'), onayAcik=onay&&onay.classList.contains('open');
+    if(e.key==='Escape'){ if(onayAcik){ e.preventDefault(); $('onayIptal').click(); } else if(openModalEl) closeModal(); return; }
+    if(e.key==='Tab'){ // açık pencerede odağı içeride tut
+      const m=onayAcik?onay:openModalEl; if(!m) return;
+      const fs=[...m.querySelectorAll(FOCUSABLE)].filter(x=>x.offsetParent!==null); if(!fs.length) return;
+      const first=fs[0], last=fs[fs.length-1];
+      if(!m.contains(document.activeElement)){ e.preventDefault(); first.focus(); }
+      else if(e.shiftKey&&document.activeElement===first){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey&&document.activeElement===last){ e.preventDefault(); first.focus(); }
+    }
+  });
 
   function confirmAsk({title,text,ok='Onayla',danger=false,check=''}){
     return new Promise(res=>{
@@ -1712,16 +1730,17 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       const okB=$('onayTamam'); okB.textContent=ok; okB.className='btn '+(danger?'btn-danger':'btn-primary');
       const cw=$('onayCheckWrap'), cb=$('onayCheck'); cw.classList.toggle('hidden',!check); $('onayCheckText').innerHTML=check; cb.checked=false; okB.disabled=!!check; cb.onchange=()=>{ okB.disabled=!cb.checked; };
       const prev=openModalEl; if(prev) prev.classList.remove('open');
-      $('modalOnay').classList.add('open');
-      const done=(v)=>{ $('modalOnay').classList.remove('open'); okB.onclick=null; $('onayIptal').onclick=null; if(prev){ prev.classList.add('open'); openModalEl=prev; } else openModalEl=null; res(v); };
+      const donus=document.activeElement;
+      $('modalOnay').classList.add('open'); setTimeout(()=>{ (check?cb:$('onayIptal')).focus({preventScroll:true}); },30);
+      const done=(v)=>{ $('modalOnay').classList.remove('open'); okB.onclick=null; $('onayIptal').onclick=null; if(prev){ prev.classList.add('open'); openModalEl=prev; } else openModalEl=null; if(donus&&donus.isConnected&&typeof donus.focus==='function') try{ donus.focus({preventScroll:true}); }catch(e){} res(v); };
       okB.onclick=()=>done(true); $('onayIptal').onclick=()=>done(false);
     });
   }
 
   /* ---------- Segmented controls ---------- */
-  function seg(el,options,val){ el.innerHTML=Object.entries(options).map(([k,v])=>`<button type="button" data-v="${k}" class="${k===val?'on':''}">${esc(v)}</button>`).join(''); el.dataset.value=val; }
+  function seg(el,options,val){ el.innerHTML=Object.entries(options).map(([k,v])=>`<button type="button" data-v="${k}" class="${k===val?'on':''}" aria-pressed="${k===val}">${esc(v)}</button>`).join(''); el.dataset.value=val; }
   function segVal(el){ return el.dataset.value; }
-  document.addEventListener('click',e=>{ const b=e.target.closest('.seg button'); if(!b) return; const s=b.parentElement; s.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); s.dataset.value=b.dataset.v; });
+  document.addEventListener('click',e=>{ const b=e.target.closest('.seg button'); if(!b) return; const s=b.parentElement; s.querySelectorAll('button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-pressed',String(x===b)); }); s.dataset.value=b.dataset.v; });
   const platformLabels=Object.fromEntries(Object.entries(PLATFORMS).map(([k,v])=>[k,v.ad]));
   const dayOpts=DAYS.map(d=>`<option value="${d}">${d}${d===TODAY?' (bugün)':''}</option>`).join('');
   $('modalIcerikGun').innerHTML=dayOpts; $('modalTaslakGun').innerHTML=dayOpts;
@@ -1805,7 +1824,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       return `<div class="day-col ${d===TODAY?'today':''}">
         <div class="day-head"><span class="day-name">${d}${d===TODAY?'<span class="today-tag">Bugün</span>':''}</span><span class="day-count">${items.length}</span></div>
         ${items.map(({c,i})=>{ const p=PLATFORMS[c.platform]?c.platform:'instagram'; return `
-          <article class="post" data-action="edit-icerik" data-index="${i}" tabindex="0">
+          <article class="post" data-action="edit-icerik" data-index="${i}" tabindex="0" title="Düzenlemek için dokun">
             <span class="chip p-${p}">${PLATFORMS[p].ad}</span>
             <h4>${esc(c.baslik||'Başlıksız içerik')}</h4>
             ${c.videoUrl?`<span class="live-chip" style="background:var(--accent-soft);color:var(--accent-ink)">▶ Video</span>`:''}${c.googlePost?`<span class="live-chip">● Google’da yayında</span>`:''}${c.yayinlar?.instagram?`<span class="live-chip">● Instagram’da yayında</span>`:''}${c.yayinlar?.facebook?`<span class="live-chip">● Facebook’ta yayında</span>`:''}
@@ -1983,7 +2002,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   /* ---------- Haftalık plan ---------- */
   let haftalikPlan=[], haftalikSecim=new Set(['instagram']);
   function renderHaftalikPlatform(){
-    $('haftalikPlatform').innerHTML=Object.entries(platformLabels).map(([k,v])=>`<button type="button" data-hp="${k}" class="${haftalikSecim.has(k)?'on':''}">${esc(v)}</button>`).join('');
+    $('haftalikPlatform').innerHTML=Object.entries(platformLabels).map(([k,v])=>`<button type="button" data-hp="${k}" class="${haftalikSecim.has(k)?'on':''}" aria-pressed="${haftalikSecim.has(k)}">${esc(v)}</button>`).join('');
   }
   $('haftalikPlatform').addEventListener('click',e=>{
     const b=e.target.closest('[data-hp]'); if(!b) return; e.stopPropagation();
@@ -2080,7 +2099,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   }
 
   let editYorumIdx=null, yildizSec=5;
-  function renderStarPick(){ $('modalYorumYildiz').innerHTML=[1,2,3,4,5].map(s=>`<button type="button" data-star="${s}" class="${s<=yildizSec?'on':''}" aria-label="${s} yıldız">★</button>`).join(''); }
+  function renderStarPick(){ $('modalYorumYildiz').innerHTML=[1,2,3,4,5].map(s=>`<button type="button" data-star="${s}" class="${s<=yildizSec?'on':''}" aria-label="${s} yıldız" aria-pressed="${s===yildizSec}">★</button>`).join(''); }
   $('modalYorumYildiz').addEventListener('click',e=>{ if($('modalYorumYildiz').classList.contains('locked')) return; const b=e.target.closest('[data-star]'); if(!b) return; yildizSec=Number(b.dataset.star); renderStarPick(); });
   function openYorum(idx=null){
     editYorumIdx=idx; const y=idx!==null?appData.yorumlar[idx]:null;
