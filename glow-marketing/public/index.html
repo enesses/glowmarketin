@@ -18,7 +18,7 @@
 <style>
 :root{
   --bg:#F6F1EA; --surface:#FFFFFF; --surface-2:#FBF7F2; --sunken:#F1EBE3;
-  --ink:#1F1A16; --ink-2:#5E554D; --ink-3:#9C928A; --line:#E8E0D6; --line-2:#DCD2C5;
+  --ink:#1F1A16; --ink-2:#5E554D; --ink-3:#776C63; --line:#E8E0D6; --line-2:#DCD2C5;
   --accent:#EE5E2A; --accent-2:#F59E3B; --accent-soft:#FDE9DD; --accent-ink:#A33B12;
   --good:#1E8A4C; --good-soft:#E1F3E8; --warn:#B7700E; --warn-soft:#FBF0DA; --bad:#D23C3C; --bad-soft:#FBE4E2;
   --ig:#C13584; --ig-soft:#FBE6F1; --fb:#1F64D6; --fb-soft:#E3EDFC; --gg:#1E8A4C; --gg-soft:#E1F3E8; --xx:#1F1A16; --xx-soft:#ECE7E1;
@@ -33,7 +33,7 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#15120F; --surface:#1E1A16; --surface-2:#231E1A; --sunken:#191512;
-    --ink:#F4EEE7; --ink-2:#C2B8AD; --ink-3:#857A70; --line:#2E2722; --line-2:#3C342D;
+    --ink:#F4EEE7; --ink-2:#C2B8AD; --ink-3:#978C82; --line:#2E2722; --line-2:#3C342D;
     --accent:#FF7440; --accent-2:#FFB35C; --accent-soft:#3B2216; --accent-ink:#FFB08A;
     --good:#4CC17E; --good-soft:#16301F; --warn:#E9A83D; --warn-soft:#33270F; --bad:#F06A6A; --bad-soft:#3A1A1A;
     --ig:#F07BC0; --ig-soft:#3A1A2D; --fb:#7EA8F5; --fb-soft:#18243A; --gg:#4CC17E; --gg-soft:#16301F; --xx:#F4EEE7; --xx-soft:#2E2722;
@@ -43,7 +43,7 @@
 }
 :root[data-theme="dark"]{
   --bg:#15120F; --surface:#1E1A16; --surface-2:#231E1A; --sunken:#191512;
-  --ink:#F4EEE7; --ink-2:#C2B8AD; --ink-3:#857A70; --line:#2E2722; --line-2:#3C342D;
+  --ink:#F4EEE7; --ink-2:#C2B8AD; --ink-3:#978C82; --line:#2E2722; --line-2:#3C342D;
   --accent:#FF7440; --accent-2:#FFB35C; --accent-soft:#3B2216; --accent-ink:#FFB08A;
   --good:#4CC17E; --good-soft:#16301F; --warn:#E9A83D; --warn-soft:#33270F; --bad:#F06A6A; --bad-soft:#3A1A1A;
   --ig:#F07BC0; --ig-soft:#3A1A2D; --fb:#7EA8F5; --fb-soft:#18243A; --gg:#4CC17E; --gg-soft:#16301F; --xx:#F4EEE7; --xx-soft:#2E2722;
@@ -58,6 +58,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 input,select,textarea{font:inherit;color:inherit}
 svg{display:block;flex-shrink:0}
 .hidden{display:none !important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}}
 .serif{font-family:var(--serif)}
 .muted{color:var(--ink-2)}
 .faint{color:var(--ink-3)}
@@ -643,7 +644,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
         <p class="check-note">Kişisel verilerin <a href="?sayfa=kvkk" target="_blank">KVKK Aydınlatma Metni</a> ve <a href="?sayfa=gizlilik" target="_blank">Gizlilik Politikası</a> kapsamında işlenir. Yapay zekâ özelliklerini kullandığında ilgili metinler, yurt dışındaki hizmet sağlayıcımız DeepSeek’e gönderilir.</p>
       </section>
 
-      <div class="setup-submit"><button type="button" id="btnSetupKaydet" class="btn btn-primary btn-block" style="height:50px;font-size:15px">Profili kaydet ve başla</button></div>
+      <div class="setup-submit"><button type="submit" id="btnSetupKaydet" class="btn btn-primary btn-block" style="height:50px;font-size:15px">Profili kaydet ve başla</button></div>
     </form>
   </main>
 </div>
@@ -799,7 +800,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
             </div>
             <div class="form-foot">
               <button type="button" class="btn btn-quiet" id="btnIsletmeGeriAl">Değişiklikleri geri al</button>
-              <button type="button" id="btnIsletmeKaydet" class="btn btn-primary">Bilgileri kaydet</button>
+              <button type="submit" id="btnIsletmeKaydet" class="btn btn-primary">Bilgileri kaydet</button>
             </div>
           </form>
           <div style="display:flex;flex-direction:column;gap:16px">
@@ -1496,7 +1497,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   +'.gc-btn:focus-visible,.gc-sw input:focus-visible+span{outline:3px solid var(--accent,#EE5E2A);outline-offset:2px}'
   +'.gc-cats{display:flex;flex-direction:column;gap:10px;margin-top:14px;max-height:46vh;overflow:auto}'
   +'.gc-cat{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line,#E8E0D6);border-radius:14px;background:var(--surface-2,#FBF7F2)}'
-  +'.gc-cat strong{font-size:14px;display:block}.gc-cat small{font-size:12.5px;color:var(--ink-3,#9C928A);line-height:1.45;display:block;margin-top:2px}'
+  +'.gc-cat strong{font-size:14px;display:block}.gc-cat small{font-size:12.5px;color:var(--ink-3,#776C63);line-height:1.45;display:block;margin-top:2px}'
   +'.gc-sw{position:relative;display:inline-block;width:44px;height:26px}.gc-sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}'
   +'.gc-sw span{position:absolute;inset:0;border-radius:99px;background:var(--line-2,#DCD2C5);transition:.2s;pointer-events:none}'
   +'.gc-sw span::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}'
@@ -2867,7 +2868,6 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       appData.sss=sss; save(); showApp(); toast('Profil kaydedildi. Hoş geldin!');
     }catch(err){ console.error(err); toast('Kaydedilirken bir hata oluştu: '+err.message,true); }
   }
-  $('btnSetupKaydet').addEventListener('click',saveSetup);
   $('setupForm').addEventListener('submit',e=>{ e.preventDefault(); saveSetup(); });
 
   /* ---------- İşletme ---------- */
@@ -2888,7 +2888,6 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     const o={}; FIELDS.forEach(f=>o[f]=$(f).value.trim());
     o.sss=cleanSss(isletmeSss); appData.isletme=o; appData.sss=o.sss; save(); renderAll(); loadIsletmeForm(); toast('Bilgiler kaydedildi.');
   }
-  $('btnIsletmeKaydet').addEventListener('click',saveIsletme);
   $('isletmeForm').addEventListener('submit',e=>{ e.preventDefault(); saveIsletme(); });
   $('btnIsletmeGeriAl').onclick=()=>{ loadIsletmeForm(); toast('Değişiklikler geri alındı.'); };
 
