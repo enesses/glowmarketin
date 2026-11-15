@@ -832,7 +832,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       <!-- PAKET -->
       <section class="section" id="section-paket">
         <div class="page-head">
-          <div><div class="eyebrow">Hesap</div><h1 class="page-title">Paket ve kullanım</h1><p class="page-sub">Taslak üretmek, yorum yanıtı ve müşteri yanıtı önermek birer kredi harcar.</p></div>
+          <div><div class="eyebrow">Hesap</div><h1 class="page-title">Paket ve kullanım</h1><p class="page-sub">Taslak, yorum yanıtı ve müşteri yanıtı önerisi 1 kredi; haftalık plan 3 kredi harcar. AI video süresine göre 20–50 kredi.</p></div>
         </div>
         <div id="krediBanner" class="banner hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>Kredin bitti. Yeni taslak üretmek için paketini yenile ya da yükselt.</div>
         <div class="plans" id="paketListesi"></div>
@@ -2836,7 +2836,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   function sssArr(l){ return l==='setup'?setupSss:isletmeSss; }
   function renderSss(l){
     const arr=sssArr(l), el=$(l==='setup'?'setupSssList':'isletmeSssList');
-    el.innerHTML=arr.length?arr.map((s,k)=>`<div class="sss-row"><input placeholder="Soru" value="${esc(s.soru)}" data-sss="${l}" data-k="${k}" data-f="soru"><input placeholder="Cevap" value="${esc(s.cevap)}" data-sss="${l}" data-k="${k}" data-f="cevap"><button type="button" class="icon-btn danger" data-action="sss-remove" data-list="${l}" data-k="${k}" aria-label="Kaldır">${ic('x')}</button></div>`).join('')
+    el.innerHTML=arr.length?arr.map((s,k)=>`<div class="sss-row"><input placeholder="Soru" aria-label="${k+1}. soru" value="${esc(s.soru)}" data-sss="${l}" data-k="${k}" data-f="soru"><input placeholder="Cevap" aria-label="${k+1}. cevap" value="${esc(s.cevap)}" data-sss="${l}" data-k="${k}" data-f="cevap"><button type="button" class="icon-btn danger" data-action="sss-remove" data-list="${l}" data-k="${k}" aria-label="${k+1}. soruyu kaldır">${ic('x')}</button></div>`).join('')
       :`<div class="sss-empty">Henüz SSS yok. Örn. “Paket servis var mı?” — “Evet, 5 km içinde ücretsiz.”</div>`;
   }
   document.addEventListener('input',e=>{ const t=e.target; if(t.dataset&&t.dataset.sss){ const a=sssArr(t.dataset.sss); if(a[t.dataset.k]) a[t.dataset.k][t.dataset.f]=t.value; } });

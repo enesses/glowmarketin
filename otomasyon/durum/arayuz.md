@@ -11,5 +11,6 @@
 - Kredi güvenliği: `runAgent` önce sonucu uygular, sonra krediyi düşer; yapay zekâdan boş/bozuk yanıt gelirse kredi gitmez ("Kredi düşülmedi" mesajı artık doğru).
 - localStorage yazılamazsa (kota/gizli sekme) kullanıcı bir kez uyarılır; çoklu sekme: `storage` olayıyla diğer sekmedeki değişiklik alınır (eski sekme yeni veriyi ezmez).
 - Hata bildirimleri metin uzunluğuna göre daha uzun ekranda kalır (en az 4 sn).
+- SSS satırlarındaki alanlara erişilebilir ad (aria-label) eklendi; Paket sayfasındaki kredi açıklaması gerçek maliyetlerle düzeltildi (haftalık plan 3, video 20–50).
 
 ## Kalanlar
