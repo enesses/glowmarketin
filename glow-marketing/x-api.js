@@ -41,14 +41,14 @@ function weightedLength(text) {
   return n;
 }
 
-function redirectOk(uri, c) {
+function redirectOk(uri, c, host = '') {
   let u; try { u = new URL(uri); } catch (_) { return false; }
   if (u.hash || u.search) return false;
   if (c.redirects.length) return c.redirects.includes(uri);
   const local = u.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(u.hostname);
   if (u.protocol !== 'https:' && !local) return false;
   if (!/\/x-callback\.html$/.test(u.pathname)) return false;
-  return local || c.origins.includes(u.origin);
+  return local || c.origins.includes(u.origin) || (!!host && u.host === host); // aynı kökenden yayın
 }
 
 async function xFetch(url, opts = {}) {
@@ -111,7 +111,7 @@ async function handle(req, res, url, { send, readBody, limited, ip }) {
     const code = str(b.code, 2048), verifier = str(b.code_verifier, 128), redirect = str(b.redirect_uri, 512);
     if (!code || !redirect) return send(res, 400, { error: 'Eksik yetkilendirme kodu.' });
     if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier)) return send(res, 400, { error: 'Geçersiz PKCE doğrulayıcısı.' });
-    if (!redirectOk(redirect, c)) return send(res, 400, { error: 'Bu yönlendirme adresine izin verilmiyor.' });
+    if (!redirectOk(redirect, c, String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim())) return send(res, 400, { error: 'Bu yönlendirme adresine izin verilmiyor.' });
     const t = await tokenCall(c, { code, grant_type: 'authorization_code', redirect_uri: redirect, code_verifier: verifier });
     const user = await me(c, t.access_token);
     console.log(`[x] bağlandı @${user.username}`);
