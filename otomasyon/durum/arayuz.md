@@ -16,5 +16,6 @@
 - Formlar Enter ile gönderilebiliyor (kaydet düğmeleri `type=submit`, çift tetikleme yok). `prefers-reduced-motion` desteği. Soluk metin rengi (`--ink-3`) WCAG AA kontrastına çekildi (açık #776C63, koyu #978C82).
 - Gece yarısını geçen açık sayfada "bugün" vurgusu ve gün seçenekleri dakikada bir / sekmeye dönünce yenilenir. Aynı anda ikinci onay penceresi açılması engellendi (ilk onayın sözü askıda kalıyordu).
 - AI video tanıtım metni sektöre göre (Restoranın / Salonun / Mağazan / İşletmen; "tabağının" yalnızca restoranda). Koyu tema ekran görüntüleriyle kontrol edildi.
+- "Daha" menüsünden Çerez tercihleri açılınca menü kapanır, odak çerez penceresine gider (odak tuzağıyla çakışma önlendi). AI yolları (taslak, haftalık plan, müşteri yanıtı, bozuk yanıt) sahte sunucuyla denendi: boş yanıtta kredi düşmüyor.
 
 ## Kalanlar

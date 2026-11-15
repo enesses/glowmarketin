@@ -1724,7 +1724,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     const onay=$('modalOnay'), onayAcik=onay&&onay.classList.contains('open');
     if(e.key==='Escape'){ if(onayAcik){ e.preventDefault(); $('onayIptal').click(); } else if(openModalEl) closeModal(); return; }
     if(e.key==='Tab'){ // açık pencerede odağı içeride tut
-      const m=onayAcik?onay:openModalEl; if(!m) return;
+      const m=onayAcik?onay:openModalEl; if(!m||document.activeElement?.closest?.('.gc-wrap')) return;
       const fs=[...m.querySelectorAll(FOCUSABLE)].filter(x=>x.offsetParent!==null); if(!fs.length) return;
       const first=fs[0], last=fs[fs.length-1];
       if(!m.contains(document.activeElement)){ e.preventDefault(); first.focus(); }
@@ -2986,6 +2986,8 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       case 'v-sil': { const j=vJob(el.dataset.id); if(j){ confirmAsk({title:'Video listeden kaldırılsın mı?',text:'Takvime eklediğin içerikler etkilenmez.',ok:'Kaldır',danger:true}).then(ok=>{ if(!ok) return; appData.videolar=appData.videolar.filter(x=>x!==j); save(); renderVideo(); }); } break; }
     }
   });
+  // Çerez tercihleri açılırken alttaki pencereyi kapat (odak tuzağı çerez penceresini engellemesin)
+  document.addEventListener('click',e=>{ if(e.target.closest('[data-cookie-settings]')){ closeModal(); setTimeout(()=>{ const f=document.querySelector('.gc-wrap .gc-btn'); if(f) f.focus(); },0); } });
   document.addEventListener('click',e=>{ const b=e.target.closest('#btnVSenaryo,#btnVUret'); if(!b) return; if(b.id==='btnVSenaryo') vSenaryo(b); else vUret(b); });
   document.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('post')){ e.preventDefault(); openIcerik(Number(e.target.dataset.index)); } });
 
