@@ -334,13 +334,13 @@ function clientIp(req) {
 }
 
 const hits = new Map();
-function limited(ip) {
+function limited(ip, max = RATE) { // dakikalık sınır; farklı kovalar için anahtara önek ver (örn. 'v:' + ip)
   const now = Date.now();
   const arr = (hits.get(ip) || []).filter((t) => now - t < 60000);
-  if (arr.length > RATE) { hits.set(ip, arr); return true; } // sınırdayken diziyi büyütme
+  if (arr.length > max) { hits.set(ip, arr); return true; } // sınırdayken diziyi büyütme
   arr.push(now);
   hits.set(ip, arr);
-  return arr.length > RATE;
+  return arr.length > max;
 }
 // Eski IP kayıtlarını temizle (bellek sızıntısını önler)
 setInterval(() => {
@@ -354,33 +354,36 @@ function send(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
-function readBody(req, limit = 60 * 1024) {
+// Gövdeyi sınırlı oku. Sınır aşılınca okumayı bırakır (soketi hemen kesmez ki 413 yanıtı istemciye ulaşsın).
+function readLimited(req, limit, tooBig) {
   return new Promise((resolve, reject) => {
-    let size = 0; const chunks = [];
+    const len = Number(req.headers['content-length']);
+    if (len > limit) { req.resume(); return reject(httpErr(413, tooBig)); }
+    let size = 0, done = false; const chunks = [];
     req.on('data', (c) => {
+      if (done) return;
       size += c.length;
-      if (size > limit) { reject(httpErr(413, 'İstek çok büyük.')); req.destroy(); return; }
+      if (size > limit) { done = true; chunks.length = 0; req.resume(); return reject(httpErr(413, tooBig)); }
       chunks.push(c);
     });
-    req.on('end', () => {
-      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); }
-      catch (_) { reject(httpErr(400, 'Geçersiz JSON.')); }
-    });
-    req.on('error', reject);
+    req.on('end', () => { if (!done) { done = true; resolve(Buffer.concat(chunks)); } });
+    req.on('error', (e) => { if (!done) { done = true; reject(httpErr(400, 'İstek okunamadı.')); } });
   });
 }
 
+// Tarayıcının ön kontrol (preflight) yapmadan başka siteden gönderebildiği türler JSON uçlarında reddedilir (CSRF).
+const SIMPLE_TYPES = /^\s*(text\/plain|application\/x-www-form-urlencoded|multipart\/form-data)\b/i;
+async function readBody(req, limit = 60 * 1024) {
+  if (SIMPLE_TYPES.test(req.headers['content-type'] || '')) throw httpErr(415, 'İstek gövdesi application/json olmalı.');
+  const buf = await readLimited(req, limit, 'İstek çok büyük.');
+  let data;
+  try { data = JSON.parse(buf.toString('utf8') || '{}'); } catch (_) { throw httpErr(400, 'Geçersiz JSON.'); }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw httpErr(400, 'Geçersiz JSON.');
+  return data;
+}
+
 function readRaw(req, limit) {
-  return new Promise((resolve, reject) => {
-    let size = 0; const chunks = [];
-    req.on('data', (c) => {
-      size += c.length;
-      if (size > limit) { reject(httpErr(413, 'Görsel en fazla 8 MB olabilir.')); req.destroy(); return; }
-      chunks.push(c);
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
-  });
+  return readLimited(req, limit, 'Görsel en fazla 8 MB olabilir.');
 }
 
 function cleanUploads() {
@@ -396,14 +399,22 @@ setInterval(cleanUploads, 6 * 3600 * 1000).unref();
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json' };
 
 function serveStatic(req, res) {
-  let rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  let rel;
+  try { rel = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch (_) { rel = null; }
+  if (rel === null || rel.includes('\0')) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Geçersiz adres'); }
   if (rel === '/') rel = '/index.html';
   const file = path.normalize(path.join(PUBLIC, rel));
-  if (!file.startsWith(PUBLIC + path.sep)) { res.writeHead(403); return res.end('Yasak'); }
+  if (!file.startsWith(PUBLIC + path.sep)) { res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Yasak'); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Bulunamadı'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' });
-    res.end(data);
+    const ext = path.extname(file);
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      ...(ext === '.html' ? { 'X-Frame-Options': 'DENY', 'Cache-Control': 'no-cache' } : {}),
+    });
+    res.end(req.method === 'HEAD' ? undefined : data);
   });
 }
 
@@ -565,12 +576,13 @@ function cors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', o);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Max-Age', '86400');
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://x');
+  let url;
+  try { url = new URL(req.url, 'http://x'); } catch (_) { return send(res, 400, { error: 'Geçersiz adres.' }); }
   cors(req, res);
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   try {
@@ -585,6 +597,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await videoSubmit(body));
     }
     if (url.pathname.startsWith('/api/video/') && req.method === 'GET') {
+      if (limited('v:' + clientIp(req), 60)) return send(res, 429, { error: 'Çok fazla istek. Bir dakika sonra tekrar dene.' });
       return send(res, 200, await videoStatus(decodeURIComponent(url.pathname.slice(11))));
     }
     // Görsel yükleme (Instagram / Facebook gönderileri için). Gövde: ham JPEG, Content-Type: image/jpeg
@@ -616,7 +629,7 @@ const server = http.createServer(async (req, res) => {
       const ip = clientIp(req);
       if (limited(ip)) return send(res, 429, { error: 'Çok fazla istek. Bir dakika sonra tekrar dene.' });
       const body = await readBody(req);
-      const agent = AGENTS[body.agent];
+      const agent = typeof body.agent === 'string' && Object.hasOwn(AGENTS, body.agent) ? AGENTS[body.agent] : null;
       if (!agent) return send(res, 400, { error: 'Bilinmeyen ajan.' });
       const t0 = Date.now();
       const out = await agent(body);
@@ -627,7 +640,10 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET') return serveStatic(req, res);
     send(res, 404, { error: 'Bulunamadı.' });
   } catch (e) {
+    if (e instanceof URIError) e = httpErr(400, 'Geçersiz adres.');
     if (!e.status) console.error(e);
+    if (res.headersSent) return res.destroy();
+    if (e.status === 413) res.setHeader('Connection', 'close'); // okunmayan gövdeyi beklemeden bağlantıyı kapat
     send(res, e.status || 500, { error: e.status ? e.message : 'Sunucu hatası.' });
   }
 });
