@@ -583,6 +583,35 @@ function serveMp4(req, res, file) {
   });
 }
 
+/* ------------------------------------------------------------------ */
+/* Meta Reklamları (Marketing API) — kısa ömürlü kullanıcı anahtarını    */
+/* uzun ömürlüye (~60 gün) çevirir. Uygulama gizli anahtarı tarayıcıya  */
+/* asla gitmez. Reklam/kampanya çağrıları tarayıcıdan, kullanıcının      */
+/* kendi anahtarıyla yapılır; sunucu hiçbir zaman kampanya açmaz.       */
+/* ------------------------------------------------------------------ */
+const META_APP_ID = (process.env.META_APP_ID || '').trim();
+const META_APP_SECRET = (process.env.META_APP_SECRET || '').trim();
+const META_GRAPH_VERSION = /^v\d{2}\.0$/.test(process.env.META_GRAPH_VERSION || '') ? process.env.META_GRAPH_VERSION : 'v25.0';
+function metaAdsReady() { return Boolean(META_APP_ID && META_APP_SECRET); }
+async function metaAdsExchange(b) {
+  if (!metaAdsReady()) throw httpErr(503, 'Sunucuda META_APP_ID / META_APP_SECRET tanımlı değil; kısa süreli bağlantı kullanılıyor.');
+  const token = str(b.token, 1000);
+  if (!/^[A-Za-z0-9_\-|.]{20,1000}$/.test(token)) throw httpErr(400, 'Geçersiz erişim anahtarı.');
+  const u = new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/oauth/access_token`);
+  u.searchParams.set('grant_type', 'fb_exchange_token');
+  u.searchParams.set('client_id', META_APP_ID);
+  u.searchParams.set('client_secret', META_APP_SECRET);
+  u.searchParams.set('fb_exchange_token', token);
+  let r;
+  try { r = await fetch(u, { signal: AbortSignal.timeout(15000) }); } catch (_) { throw httpErr(502, 'Meta’ya ulaşılamadı.'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) {
+    console.warn('[meta-ads] exchange', r.status, j.error?.code, j.error?.message);
+    throw httpErr(502, 'Meta anahtarı uzatılamadı. Uygulama kimliği ile gizli anahtarın eşleştiğinden emin ol.');
+  }
+  return { token: j.access_token, expires_in: Number(j.expires_in) || 0 };
+}
+
 function cors(req, res) {
   const o = req.headers.origin;
   if (!o || !(ORIGINS.includes('*') || ORIGINS.includes(o))) return;
@@ -601,6 +630,15 @@ const server = http.createServer(async (req, res) => {
   try {
     if (url.pathname === '/api/health' && req.method === 'GET') {
       return send(res, 200, { ok: true, surum: VERSION, calisma: Math.round(process.uptime()), ai: Boolean(KEY), model: MODEL, ajanlar: Object.keys(AGENTS), media: Boolean(PUBLIC_URL), video: Boolean(videoProvider() && PUBLIC_URL), videoModel: VIDEO_MODEL });
+    }
+    if (url.pathname === '/api/meta-ads/status' && req.method === 'GET') {
+      return send(res, 200, { exchange: metaAdsReady(), graphVersion: META_GRAPH_VERSION });
+    }
+    if (url.pathname === '/api/meta-ads/exchange') {
+      if (req.method !== 'POST') return send(res, 405, { error: 'Yalnızca POST.' });
+      const ip = clientIp(req);
+      if (limited(ip)) return send(res, 429, { error: 'Çok fazla istek. Bir dakika sonra tekrar dene.' });
+      return send(res, 200, await metaAdsExchange(await readBody(req, 4 * 1024)));
     }
     if (url.pathname === '/api/video' && req.method === 'POST') {
       const ip = clientIp(req);
@@ -639,7 +677,7 @@ const server = http.createServer(async (req, res) => {
     }
     // X (Twitter) bağlantısı — ayrıntılar x-api.js
     if (url.pathname.startsWith('/api/x/')) {
-      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+      const ip = clientIp(req);
       return await require('./x-api').handle(req, res, url, { send, readBody, limited, ip });
     }
     if (url.pathname === '/api/agent') {
