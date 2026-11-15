@@ -1,0 +1,13 @@
+{
+  "name": "glow-marketing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Glow Marketing — DeepSeek destekli pazarlama asistanı",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

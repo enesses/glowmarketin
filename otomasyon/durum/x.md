@@ -1,0 +1,3 @@
+# Durum — x
+
+Henüz başlamadı.

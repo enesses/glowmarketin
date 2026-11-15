@@ -1,0 +1,3 @@
+# Durum — arayuz
+
+Henüz başlamadı.

@@ -1,0 +1,3 @@
+# Durum — sunucu
+
+Henüz başlamadı.
