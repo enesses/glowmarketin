@@ -2888,12 +2888,12 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
             <span class="conn-status ${gConnected()?'on':'off'}"><i class="ai-dot"></i>${gConnected()?'Bağlı':'Bağlı değil'}</span></div>
           ${gBody}
         </div>
+        ${maCard()}
         <div class="card conn-card">
           <div class="conn-head"><div class="conn-logo m">f</div><div><h3>Instagram ve Facebook</h3><p>Gönderi yayınlama ve yorum yanıtlama</p></div>
             <span class="conn-status ${mConnected()&&mm.hata!=='token'?'on':'off'}"><i class="ai-dot"></i>${mConnected()?(mm.hata==='token'?'Yeniden bağlan':'Bağlı'):'Bağlı değil'}</span></div>
           ${mBody}
         </div>
-        ${maCard()}
         <div class="card conn-card">
           <div class="conn-head"><div class="conn-logo ai">${ic('cpu')}</div><div><h3>Yapay zekâ sunucusu</h3><p>DeepSeek ajanları · API anahtarı burada tutulur</p></div>
             <span class="conn-status ${AI.on?'on':'off'}"><i class="ai-dot"></i>${AI.on?esc(AI.model||'Açık'):'Şablon modu'}</span></div>

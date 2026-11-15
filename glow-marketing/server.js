@@ -586,6 +586,15 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/health' && req.method === 'GET') {
       return send(res, 200, { ok: true, ai: Boolean(KEY), model: MODEL, ajanlar: Object.keys(AGENTS), media: Boolean(PUBLIC_URL), video: Boolean(videoProvider() && PUBLIC_URL), videoModel: VIDEO_MODEL });
     }
+    if (url.pathname === '/api/meta-ads/status' && req.method === 'GET') {
+      return send(res, 200, { exchange: metaAdsReady(), graphVersion: META_GRAPH_VERSION });
+    }
+    if (url.pathname === '/api/meta-ads/exchange') {
+      if (req.method !== 'POST') return send(res, 405, { error: 'Yalnızca POST.' });
+      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+      if (limited(ip)) return send(res, 429, { error: 'Çok fazla istek. Bir dakika sonra tekrar dene.' });
+      return send(res, 200, await metaAdsExchange(await readBody(req, 4 * 1024)));
+    }
     if (url.pathname === '/api/video' && req.method === 'POST') {
       const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
       if (!PUBLIC_URL) return send(res, 503, { error: 'Sunucuda PUBLIC_URL tanımlı değil; video kaydedilemiyor.' });
@@ -619,15 +628,6 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff', 'Access-Control-Allow-Origin': '*' });
         res.end(data);
       });
-    }
-    if (url.pathname === '/api/meta-ads/status' && req.method === 'GET') {
-      return send(res, 200, { exchange: metaAdsReady(), graphVersion: META_GRAPH_VERSION });
-    }
-    if (url.pathname === '/api/meta-ads/exchange') {
-      if (req.method !== 'POST') return send(res, 405, { error: 'Yalnızca POST.' });
-      const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
-      if (limited(ip)) return send(res, 429, { error: 'Çok fazla istek. Bir dakika sonra tekrar dene.' });
-      return send(res, 200, await metaAdsExchange(await readBody(req, 4 * 1024)));
     }
     if (url.pathname === '/api/agent') {
       if (req.method !== 'POST') return send(res, 405, { error: 'Yalnızca POST.' });
