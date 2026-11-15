@@ -354,7 +354,7 @@ setInterval(() => {
 }, 5 * 60000).unref();
 
 function send(res, status, obj) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
   res.end(JSON.stringify(obj));
 }
 
@@ -576,10 +576,10 @@ function serveMp4(req, res, file) {
       if (isNaN(start) || start < 0 || start >= st.size || end < start) { res.writeHead(416, { 'Content-Range': `bytes */${st.size}` }); return res.end(); }
       end = Math.min(end, st.size - 1);
       res.writeHead(206, { ...common, 'Content-Range': `bytes ${start}-${end}/${st.size}`, 'Content-Length': end - start + 1 });
-      return fs.createReadStream(file, { start, end }).pipe(res);
+      return fs.createReadStream(file, { start, end }).on('error', () => res.destroy()).pipe(res);
     }
     res.writeHead(200, { ...common, 'Content-Length': st.size });
-    fs.createReadStream(file).pipe(res);
+    fs.createReadStream(file).on('error', () => res.destroy()).pipe(res); // dosya bu arada silinirse çökme
   });
 }
 
@@ -682,5 +682,7 @@ server.listen(PORT, () => {
   console.log(`Glow Marketing → http://localhost:${PORT}`);
   console.log(KEY ? `Yapay zekâ: açık (${MODEL})` : 'UYARI: DEEPSEEK_API_KEY yok — uygulama şablon modunda çalışacak.');
   const vp = videoProvider();
+  if (PUBLIC_URL && !/^https:\/\//.test(PUBLIC_URL)) console.log('UYARI: PUBLIC_URL https ile başlamıyor; Instagram görselleri ve videolar okunamayabilir.');
+  if (ORIGINS.includes('*')) console.log('UYARI: ALLOWED_ORIGINS=* — her site bu sunucunun yapay zekâ kredisini kullanabilir. Yalnızca kendi alan adlarını yaz.');
   console.log(vp && PUBLIC_URL ? `AI video: açık (${vp} · ${VIDEO_MODEL} · ${VIDEO_RES})` : 'AI video: kapalı (FAL_KEY veya OPENROUTER_API_KEY ve PUBLIC_URL gerekli)');
 });
