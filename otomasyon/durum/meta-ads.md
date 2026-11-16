@@ -20,6 +20,7 @@ Son güncelleme: 16 Kas 2026, 1. dalga (~08:00).
 - Ön kontrol **sayfa anahtarıyla** yapılıyor (reklam anahtarında sayfa okuma izni yok). Denetim hata verirse engellemiyoruz; Meta zaten uygun olmayanı reddeder.
 - Gizlilik metni arayüz ajanının alanında olsa da bugünkü tablo bu görevi meta-ads'e verdi; yalnızca 5. bölüme yeni `<li>` ve 6. bölümdeki Meta hücresine cümle eklendi (yer tutuculara dokunulmadı).
 - Asla ACTIVE yok: yeni kod da yalnızca PAUSED oluşturuyor; test denetliyor.
+- Birleştirme denemesi (07:40): `main` + `ajan/sunucu` + `ajan/arayuz` + `ajan/x` + `ajan/meta-ads` geçici çalışma ağacında çakışmasız birleşti, smoke-test geçti. Bugünkü 4 görev tamamlandı; dalga erken bitirildi.
 
 ### Kullanıcının yapması gerekenler
 1. (15 Kasım listesi geçerli) Marketing API ürünü, `ads_read/ads_management/business_management` Advanced Access, `.env` `META_APP_ID`/`META_APP_SECRET`.
