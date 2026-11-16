@@ -1,7 +1,34 @@
 # Durum — sunucu
 
 ## 16 Kasım (2. gün)
-Henüz başlamadı. Görevler: otomasyon/AJANLAR.md → "16 Kasım" tablosu.
+Durum: **tamamlandı** (1. dalga, 07:30–07:40 İstanbul). 4 görevin hepsi bitti, tüm testler geçiyor.
+
+### Yapılanlar
+- [1] Bilinmeyen `/api/*` (ve `/api`) her yöntemde (GET/POST/PUT/DELETE/HEAD) JSON 404 `{error:'Bu API ucu bulunamadı.'}`; artık statik dosya aramasına düşüp düz metin 404 dönmüyor. `/api/x/*` bilinmeyenleri zaten x-api.js'te JSON 404.
+- [1+] `/api/health` GET/HEAD dışı → 405. API dışı adreslerde GET/HEAD dışı yöntem → JSON 405. Statik dosyalar HEAD'e de yanıt veriyor (önceden yönlendirici HEAD'i statiğe göndermiyordu).
+- [2] Video indirmesi belleğe alınmıyor: `Readable.fromWeb(r.body)` → bayt sayan Transform (256 MB aşılınca keser) → `<ad>.mp4.<pid>.<zaman>.tmp` → `rename`. Hata/kopmada `.tmp` silinir, yarım dosya "hazır" görünmez. `Content-Length` ön kontrolü ve eşzamanlı indirme tekilleştirmesi korundu. İndirme `fetch` ağ hatası artık 500 değil 502 (Türkçe mesaj).
+- [3] `/api/health` → `x` (X_CLIENT_ID tanımlı mı) ve `metaAds` (META_APP_ID + META_APP_SECRET tanımlı mı, yani uzun ömürlü anahtar değişimi açık mı) bayrakları. Yalnızca boolean; değer yanıtlanmaz.
+- [4] Uç denetimi: tüm `server.js` hata yanıtları Türkçe. DeepSeek 400/422 mesajları "DeepSeek …" diye netleştirildi. Yeni `redact()` yardımcısı: `.env`'deki gizli değerler (DEEPSEEK_API_KEY, FAL_KEY, OPENROUTER_API_KEY, META_APP_SECRET, X_CLIENT_SECRET) ve bilinen biçimler (`sk-…`, `EAA…` Meta anahtarı, `Bearer/Basic/Key …`, `access_token=`, `client_secret=` vb.) loglarda `***` olur. Uygulandığı loglar: DeepSeek hata, video sağlayıcı hata, Meta Ads exchange uyarısı, beklenmeyen hata, yakalanmamış söz.
+- Testler: `otomasyon/testler/sunucu-api.mjs` (JSON 404, 405, HEAD, health bayrakları), `otomasyon/testler/sunucu-video-akis.mjs` (sahte fal.ai ile akış kaydı, küçük/kopuk video → 502 ve .tmp yok, anahtarı yansıtan sağlayıcı hatasında yanıt Türkçe ve log maskeli). Bu test kendi sunucusunu 3996/3997 portlarında, geçici UPLOADS_DIR ile açar.
+
+### Denetim sonucu (x-api.js ve Meta Ads — işlev değiştirilmedi)
+- `x-api.js`: gizli anahtar sızıntısı yok. `X_CLIENT_SECRET` yalnızca X'e giden Basic başlığında; loglar yalnızca `@kullanıcı` ve gönderi kimliği. `/api/x/config` `clientId` döndürüyor — bu gizli değil (PKCE için tarayıcıda gerekli). `access_token/refresh_token` yalnızca sahibine (tarayıcıya) dönüyor, sunucuda saklanmıyor. Hata mesajları Türkçe; yalnızca X'in kendi açıklaması (`detail`) İngilizce olarak mesaj sonuna ekleniyor — bilerek bırakıldı.
+- Meta Ads (`/api/meta-ads/status`, `/api/meta-ads/exchange`): `META_APP_SECRET` yanıtta yok; yalnızca Meta'ya giden URL'de. fetch hatası URL'yi loglamıyor. Exchange uyarı logu artık maskeli. Hata mesajları Türkçe.
+- Küçük tutarsızlık (x ajanına öneri, dokunmadım): x-api.js bilinmeyen uçta `'Bulunamadı.'`, server.js `'Bu API ucu bulunamadı.'` diyor.
+
+### Kalanlar
+- Yok (bugünkü 4 görev bitti).
+- İleride: video için `VIDEO_MAX` testte 256 MB indirmek pahalı olduğundan sınır aşımı yalnızca kodla doğrulandı (Content-Length ön kontrolü + Transform).
+
+### Kararlar
+- Bilinmeyen-ama-var-olan yoldaki yanlış yöntem (ör. `DELETE /api/video`) görev tanımına uygun olarak JSON 404 döner; yalnızca `/api/health` için 405 eklendi (en çok yoklanan uç).
+- `metaAds` bayrağı = "sunucu tarafı yapılandırıldı mı" (APP_ID + SECRET). Meta Ads kısa süreli anahtarla bu olmadan da çalışabildiği için `false` "kapalı" değil "uzatma kapalı" demek.
+- `.tmp` adı pid + zaman içeriyor: çökmeden kalan eski `.tmp` ile çakışmaz; artıklar `cleanUploads` ile 14 günde silinir.
+- x-api.js ve Meta Ads işlevlerine dokunulmadı; yalnızca server.js içindeki Meta Ads logu maskelendi (aynı ajanla çakışma riski: tek satır).
+
+### Kullanıcının yapması gerekenler
+- Yeni bir şey yok. 15 Kasım listesi geçerli: `.env`'de `TRUST_PROXY`, `ALLOWED_ORIGINS` (yıldız değil), `PUBLIC_URL` (https), `DEEPSEEK_API_KEY`, video için `FAL_KEY`/`OPENROUTER_API_KEY`.
+- Dağıtımdan sonra `GET /api/health` ile `x` ve `metaAds` bayraklarına bakarak X_CLIENT_ID ve META_APP_ID/SECRET'ın gerçekten yüklendiğini doğrula.
 
 ---
 # 15 Kasım (1. gün) kaydı
