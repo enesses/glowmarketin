@@ -1776,7 +1776,16 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   }
   /* Azaltılmış hareket tercihine uyan kaydırma davranışı */
   function scrollBeh(){ try{ return window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'; }catch(e){ return 'auto'; } }
-  function go(id){
+  let goSoruyor=false;
+  function go(id,zorla){
+    // İşletme formunda kaydedilmemiş değişiklik varsa sayfadan çıkmadan önce sor
+    if(!zorla&&current==='isletme'&&id!=='isletme'&&isletmeDegisti()){
+      if(goSoruyor) return;
+      goSoruyor=true;
+      confirmAsk({title:'Kaydedilmemiş değişiklikler var',text:'İşletme bilgilerinde kaydetmediğin değişiklikler var. Bu sayfadan çıkarsan kaybolacaklar.',ok:'Kaydetmeden çık',danger:true})
+        .then(v=>{ goSoruyor=false; if(v){ isletmeSnap=null; go(id,true); } else { const b=$('btnIsletmeKaydet'); if(b) b.focus({preventScroll:true}); } });
+      return;
+    }
     current=id;
     document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id==='section-'+id));
     renderNav();
@@ -3104,10 +3113,16 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
 
   /* ---------- İşletme ---------- */
   const FIELDS=['isletmeAdi','sektor','sehir','ulke','dil','uslup','onecikanlar','telefon','saatler','adres'];
+  let isletmeSnap=null;
+  function isletmeFormDurum(){ const o={}; FIELDS.forEach(f=>o[f]=($(f).value||'').trim()); o.sss=cleanSss(isletmeSss); return JSON.stringify(o); }
+  function isletmeDegisti(){ try{ return isletmeSnap!==null&&!$('mainApp').classList.contains('hidden')&&isletmeFormDurum()!==isletmeSnap; }catch(e){ return false; } }
   function loadIsletmeForm(){
     const i=I(); FIELDS.forEach(f=>{ $(f).value=i[f]||(f==='sektor'?'diger':f==='uslup'?'samimi':''); });
     isletmeSss=(i.sss||appData.sss||[]).map(s=>({...s})); renderSss('isletme'); renderPreview();
+    isletmeSnap=isletmeFormDurum();
   }
+  // Sekme kapanırken / sayfa yenilenirken tarayıcının kendi uyarısı
+  window.addEventListener('beforeunload',e=>{ if(current==='isletme'&&isletmeDegisti()){ e.preventDefault(); e.returnValue=''; return ''; } });
   function renderPreview(){
     const i=I();
     const row=(icn,v)=>v?`<div>${ic(icn)}<span>${esc(v)}</span></div>`:'';
@@ -3225,8 +3240,8 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
 
   /* ---------- Boot ---------- */
   function renderAll(){ renderChrome(); renderDashboard(); renderTakvim(); renderYorumlar(); renderMusteri(); renderPaket(); if(current==='video') renderVideo(); }
-  function showSetup(){ $('mainApp').classList.add('hidden'); $('setupScreen').classList.remove('hidden'); renderSss('setup'); window.scrollTo(0,0); }
-  function showApp(){ $('setupScreen').classList.add('hidden'); $('mainApp').classList.remove('hidden'); renderAll(); go('anasayfa'); }
+  function showSetup(){ isletmeSnap=null; $('mainApp').classList.add('hidden'); $('setupScreen').classList.remove('hidden'); renderSss('setup'); window.scrollTo(0,0); }
+  function showApp(){ $('setupScreen').classList.add('hidden'); $('mainApp').classList.remove('hidden'); renderAll(); go('anasayfa',true); }
   /* ---------- Yönlendirme: ?sayfa=<anahtar> yasal metni, diğer her şey uygulamayı açar ---------- */
   const LEGAL_KEYS=['kvkk','gizlilik','cerez','sartlar','abonelik','mesafeli','riza'];
   let appBooted=false, tocIO=null;
