@@ -8,9 +8,9 @@ Durum: çalışıyor (1. dalga, 07:30 başladı).
 - [3] `/api/health` → `x` (X_CLIENT_ID var mı) ve `metaAds` (META_APP_ID+SECRET var mı) bayrakları; yalnızca boolean. `/api/health` GET/HEAD dışı → 405.
 - Statik dosyalar artık HEAD'e de yanıt veriyor; API dışı GET/HEAD olmayan istek → JSON 405.
 - Test: `otomasyon/testler/sunucu-api.mjs`.
+- [2] Video indirmesi artık belleğe alınmıyor: `Readable.fromWeb` → sayan Transform (256 MB aşılınca keser) → `<ad>.<pid>.<zaman>.tmp` → rename. Hata/kopmada .tmp silinir; indirme `fetch` ağ hatası artık 500 değil 502. Test: `otomasyon/testler/sunucu-video-akis.mjs` (sahte fal.ai, ayrı port 3996/3997, geçici UPLOADS_DIR).
 
 ### Kalanlar
-- [2] Video indirmesini akışla diske yazma.
 - [4] Uç uç hata mesajı / gizli anahtar sızıntısı denetimi.
 
 ---

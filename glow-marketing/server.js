@@ -517,13 +517,32 @@ function saveVideo(taskId, srcUrl, headers) {
 async function saveVideoOnce(taskId, srcUrl, headers) {
   const name = videoFileName(taskId), file = path.join(UPLOADS, name);
   if (!fs.existsSync(file)) {
-    const r = await fetch(srcUrl, { headers, redirect: 'follow', signal: AbortSignal.timeout(180000) });
+    let r;
+    try { r = await fetch(srcUrl, { headers, redirect: 'follow', signal: AbortSignal.timeout(180000) }); }
+    catch (_) { throw httpErr(502, 'Üretilen video indirilemedi. Biraz sonra tekrar dene.'); }
     if (!r.ok) throw httpErr(502, 'Üretilen video indirilemedi.');
     if (Number(r.headers.get('content-length')) > VIDEO_MAX) throw httpErr(502, 'Üretilen video çok büyük.');
-    const buf = Buffer.from(await r.arrayBuffer());
-    if (buf.length > VIDEO_MAX || buf.length < 1000) throw httpErr(502, 'Üretilen video geçersiz.');
-    fs.writeFileSync(file + '.tmp', buf); fs.renameSync(file + '.tmp', file); // yarım dosya "hazır" sanılmasın
-    console.log(`[video] kaydedildi ${name} ${(buf.length / 1048576).toFixed(1)} MB`);
+    if (!r.body) throw httpErr(502, 'Üretilen video indirilemedi.');
+    // Belleğe almadan akışla diske yaz; 256 MB aşılırsa kes. Önce .tmp, bitince rename (yarım dosya "hazır" sanılmasın).
+    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+    let size = 0;
+    const limit = new (require('stream').Transform)({
+      transform(chunk, _enc, cb) {
+        size += chunk.length;
+        cb(size > VIDEO_MAX ? httpErr(502, 'Üretilen video çok büyük.') : null, chunk);
+      },
+    });
+    try {
+      await require('stream/promises').pipeline(require('stream').Readable.fromWeb(r.body), limit, fs.createWriteStream(tmp));
+      if (size < 1000) throw httpErr(502, 'Üretilen video geçersiz.');
+      fs.renameSync(tmp, file);
+    } catch (e) {
+      try { fs.unlinkSync(tmp); } catch (_) {}
+      if (e.status) throw e;
+      console.error('[video] indirme/yazma hatası:', e.code || e.name || 'bilinmiyor');
+      throw httpErr(502, 'Üretilen video indirilemedi.');
+    }
+    console.log(`[video] kaydedildi ${name} ${(size / 1048576).toFixed(1)} MB`);
   }
   const u = `${PUBLIC_URL}/media/${name}`;
   videoDone.set(taskId, u);
