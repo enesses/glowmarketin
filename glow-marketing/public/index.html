@@ -841,7 +841,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
         <p class="plans-note">Paket seçerek <a href="?sayfa=abonelik">Abonelik ve Ödeme Koşulları</a>’nı ve <a href="?sayfa=mesafeli">Mesafeli Satış Sözleşmesi</a>’ni kabul etmiş olursun. Aboneliği istediğin an iptal edebilirsin; iptal dönem sonunda geçerli olur.</p>
         <div class="usage">
           <div class="card stat"><div class="stat-label">Kalan kredi</div><div class="stat-value" id="paketKredi">0</div><div class="meter"><i id="paketMeter"></i></div><div class="stat-sub" id="paketKrediSub"></div></div>
-          <div class="card stat"><div class="stat-label">Üretilen taslak</div><div class="stat-value" id="paketToplamTaslak">0</div><div class="stat-sub">Toplam</div></div>
+          <div class="card stat"><div class="stat-label">Yapay zekâ üretimi</div><div class="stat-value" id="paketToplamTaslak">0</div><div class="stat-sub">Taslak, plan, yanıt ve video · toplam</div></div>
           <div class="card stat"><div class="stat-label">Aktif paket</div><div class="stat-value" id="paketAktif">Plus</div><div class="stat-sub" id="paketAktifFiyat"></div></div>
         </div>
       </section>
@@ -1774,6 +1774,8 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     $('tabNav').innerHTML=NAV.filter(n=>n.tab).map(n=>`<button class="tab ${n.id===current?'active':''}" data-action="nav" data-section="${n.id}">${ic(n.i)}<span>${n.kisa}</span>${badge(n.id)}</button>`).join('')
       +`<button class="tab ${moreActive?'active':''}" data-action="more">${ic('dots')}<span>Daha</span></button>`;
   }
+  /* Azaltılmış hareket tercihine uyan kaydırma davranışı */
+  function scrollBeh(){ try{ return window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'; }catch(e){ return 'auto'; } }
   function go(id){
     current=id;
     document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id==='section-'+id));
@@ -1781,7 +1783,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     if(id==='isletme') loadIsletmeForm();
     if(id==='baglantilar') renderBaglantilar();
     if(id==='video') renderVideo();
-    window.scrollTo({top:0,behavior:'smooth'});
+    window.scrollTo({top:0,behavior:scrollBeh()});
   }
 
   /* ---------- Chrome (sidebar etc.) ---------- */
@@ -2699,9 +2701,9 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
         if(r.status===400){ j.durum='FAILED'; j.hata=d.error||'Geçersiz görev.'; }
         else if(d.status==='SUCCEEDED'&&d.url){ j.durum='SUCCEEDED'; j.url=d.url; toast(`“${j.baslik||'AI video'}” hazır!`); }
         else if(d.status==='FAILED'){ j.durum='FAILED'; j.hata=d.error; }
-        if(j.durum==='FAILED'&&!j.iade){ appData.kredi+=j.kredi||0; j.iade=true; renderChrome(); renderPaket(); }
+        if(j.durum==='FAILED'&&!j.iade){ appData.kredi+=j.kredi||0; appData.toplamTaslak=Math.max(0,appData.toplamTaslak-1); j.iade=true; renderChrome(); renderPaket(); }
         if(j.durum!=='RUNNING') degisti=true;
-        else if(Date.now()-new Date(j.tarih).getTime()>40*60000){ j.durum='FAILED'; j.hata='Üretim 40 dakikada tamamlanmadı.'; if(!j.iade){ appData.kredi+=j.kredi||0; j.iade=true; } degisti=true; }
+        else if(Date.now()-new Date(j.tarih).getTime()>40*60000){ j.durum='FAILED'; j.hata='Üretim 40 dakikada tamamlanmadı.'; if(!j.iade){ appData.kredi+=j.kredi||0; appData.toplamTaslak=Math.max(0,appData.toplamTaslak-1); j.iade=true; } degisti=true; }
       }catch(e){}
     }
     if(degisti) save();
@@ -3078,7 +3080,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   function markInvalid(ids){
     document.querySelectorAll('.field.invalid').forEach(f=>f.classList.remove('invalid'));
     ids.forEach(id=>{ const f=$(id).closest('.field'); if(f) f.classList.add('invalid'); });
-    if(ids.length){ const first=$(ids[0]); first.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(()=>first.focus({preventScroll:true}),300); }
+    if(ids.length){ const first=$(ids[0]); first.scrollIntoView({behavior:scrollBeh(),block:'center'}); setTimeout(()=>first.focus({preventScroll:true}),300); }
   }
   document.addEventListener('input',e=>{ const f=e.target.closest&&e.target.closest('.field.invalid'); if(f&&e.target.value.trim()) f.classList.remove('invalid'); });
   document.addEventListener('change',e=>{ const f=e.target.closest&&e.target.closest('.field.invalid'); if(f&&e.target.value.trim()) f.classList.remove('invalid'); if(e.target.id==='chkSartlar'&&e.target.checked) $('chkSartlarWrap').classList.remove('invalid'); });
@@ -3090,7 +3092,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       const miss=req.filter(id=>!v(id));
       if(miss.length){ markInvalid(miss); return toast(miss.length===1?'Eksik alan var: kırmızı işaretli alanı doldur.':`${miss.length} zorunlu alan boş: kırmızı işaretli alanları doldur.`,true); }
       markInvalid([]);
-      if(!$('chkSartlar').checked){ const w=$('chkSartlarWrap'); w.classList.add('invalid'); w.scrollIntoView({behavior:'smooth',block:'center'}); return toast('Devam etmek için Kullanım Şartları’nı kabul etmelisin.',true); }
+      if(!$('chkSartlar').checked){ const w=$('chkSartlarWrap'); w.classList.add('invalid'); w.scrollIntoView({behavior:scrollBeh(),block:'center'}); return toast('Devam etmek için Kullanım Şartları’nı kabul etmelisin.',true); }
       const simdi=new Date().toISOString();
       appData.onaylar={sartlar:{surum:'2026-11-03',tarih:simdi},ticariIleti:{onay:$('chkTicari').checked,tarih:simdi}};
       const sss=cleanSss(setupSss);
@@ -3206,7 +3208,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       case 'v-gorsel-sec': $('vGorselInput').click(); break;
       case 'v-gorsel-sil': vOku(); vDurum.gorsel=''; renderVideo(); break;
       case 'v-takvim': vTakvim(el.dataset.id); break;
-      case 'v-tekrar': { const j=vJob(el.dataset.id); if(j){ vDurum={...vDurum,fikir:j.fikir||'',gorsel:j.gorsel||'',oran:j.oran,sure:j.sure,stil:j.stil||'sinematik',prompt:j.prompt,baslik:j.baslik,aciklama:j.aciklama}; renderVideo(); window.scrollTo({top:0,behavior:'smooth'}); } break; }
+      case 'v-tekrar': { const j=vJob(el.dataset.id); if(j){ vDurum={...vDurum,fikir:j.fikir||'',gorsel:j.gorsel||'',oran:j.oran,sure:j.sure,stil:j.stil||'sinematik',prompt:j.prompt,baslik:j.baslik,aciklama:j.aciklama}; renderVideo(); window.scrollTo({top:0,behavior:scrollBeh()}); } break; }
       case 'v-sil': { const j=vJob(el.dataset.id); if(j){ confirmAsk({title:'Video listeden kaldırılsın mı?',text:'Takvime eklediğin içerikler etkilenmez.',ok:'Kaldır',danger:true}).then(ok=>{ if(!ok) return; appData.videolar=appData.videolar.filter(x=>x!==j); save(); renderVideo(); }); } break; }
     }
   });
