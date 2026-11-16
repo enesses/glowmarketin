@@ -1,5 +1,11 @@
 # Durum — arayuz
 
+## 16 Kasım (2. gün)
+Henüz başlamadı. Görevler: otomasyon/AJANLAR.md → "16 Kasım" tablosu.
+
+---
+# 15 Kasım (1. gün) kaydı
+
 1. dalga tamamlandı (15 Kasım 2026, 15:00–15:15 İstanbul). Dal: `ajan/arayuz`. Tüm commit'lerde `node otomasyon/smoke-test.mjs` geçti.
 Doğrulama: Playwright ile 1280 / 360 / 320 px, açık ve koyu tema; tüm sayfalar, pencereler, bozuk localStorage, iki sekme, gece yarısı geçişi, sahte AI sunucusu senaryoları hatasız.
 

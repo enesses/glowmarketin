@@ -1,5 +1,11 @@
 # Durum — meta-ads
 
+## 16 Kasım (2. gün)
+Henüz başlamadı. Görevler: otomasyon/AJANLAR.md → "16 Kasım" tablosu.
+
+---
+# 15 Kasım (1. gün) kaydı
+
 Son güncelleme: 15 Kas 2026, 1. dalga.
 
 ## Yapılanlar
