@@ -14,6 +14,9 @@ export default async function (_base, ok, bad) {
     const m = req.url.match(/^\/bytedance\/seedance-2\.5\/requests\/([a-z]+)(\/status)?$/);
     if (m && m[2]) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end('{"status":"COMPLETED"}'); }
     if (m) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ video: { url: `http://127.0.0.1:${MOCK}/${m[1]}.mp4` } })); }
+    if (req.method === 'POST' && req.url === '/bytedance/seedance-2.5/text-to-video') { // anahtarı geri yansıtan sağlayıcı hatası
+      res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ detail: `Invalid key ${req.headers.authorization} sk-abcdef1234567890` }));
+    }
     if (req.url === '/iyi.mp4') { res.writeHead(200, { 'Content-Type': 'video/mp4' }); // parça parça (chunked) gönder
       let i = 0; const step = () => { if (i >= video.length) return res.end(); res.write(video.subarray(i, i += 64 * 1024)); setImmediate(step); }; return step(); }
     if (req.url === '/kucuk.mp4') { res.writeHead(200, { 'Content-Type': 'video/mp4' }); return res.end('abc'); }
@@ -54,7 +57,15 @@ export default async function (_base, ok, bad) {
       const mp4 = fs.readdirSync(dir).filter((f) => f.endsWith('.mp4'));
       return (!tmps().length && mp4.length === 1) || `dosyalar: ${fs.readdirSync(dir).join(',')}`;
     });
-    await t('[sunucu] loglarda sağlayıcı anahtarı yok', async () => !log.includes('test-fal-gizli') || 'FAL_KEY logda göründü');
+    await t('[sunucu] sağlayıcı hatası Türkçe, anahtar logda maskeli', async () => {
+      const r = await fetch(base + '/api/video', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify({ paket: 'Max', prompt: 'Bir kafede sabah kahvesi hazırlanıyor', duration: 5, aspectRatio: '9:16' }) });
+      const j = await r.json();
+      if (r.status !== 401 || !/anahtarı geçersiz/.test(j.error || '')) return `durum ${r.status} ${JSON.stringify(j)}`;
+      if (JSON.stringify(j).includes('test-fal-gizli')) return 'anahtar yanıtta';
+      await new Promise((res) => setTimeout(res, 100));
+      if (!log.includes('[video] fal 401')) return 'hata loglanmadı';
+      return (!log.includes('test-fal-gizli') && !log.includes('sk-abcdef1234567890')) || 'anahtar logda göründü';
+    });
   } finally {
     srv.kill(); mock.close();
     fs.rmSync(dir, { recursive: true, force: true });

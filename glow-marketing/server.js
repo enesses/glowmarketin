@@ -99,6 +99,19 @@ function parseJSON(text) {
   throw httpErr(502, 'Yapay zekâ beklenen biçimde yanıt vermedi. Tekrar dene.');
 }
 
+// Loglara gizli anahtar düşmesin: .env'deki gizli değerler ve bilinen anahtar biçimleri maskelenir.
+const SECRET_ENVS = ['DEEPSEEK_API_KEY', 'FAL_KEY', 'OPENROUTER_API_KEY', 'META_APP_SECRET', 'X_CLIENT_SECRET'];
+function redact(v) {
+  let t = v instanceof Error ? (v.stack || v.message) : typeof v === 'string' ? v : (() => { try { return JSON.stringify(v); } catch (_) { return String(v); } })();
+  t = String(t ?? '');
+  for (const k of SECRET_ENVS) { const val = String(process.env[k] || '').trim(); if (val.length >= 6) t = t.split(val).join('***'); }
+  return t
+    .replace(/\b(sk-(?:or-v1-)?)[A-Za-z0-9_-]{8,}/g, '$1***')
+    .replace(/\bEAA[A-Za-z0-9]{20,}/g, 'EAA***')
+    .replace(/(Bearer|Basic|Key)\s+[A-Za-z0-9._~+/=:-]{8,}/gi, '$1 ***')
+    .replace(/((?:access|refresh|fb_exchange)_token|client_secret|code_verifier|api_key)(["']?\s*[:=]\s*["']?)[^"'&\s,}]+/gi, '$1$2***');
+}
+
 function httpErr(status, message) { const e = new Error(message); e.status = status; return e; }
 
 function cleanText(t) {
@@ -139,13 +152,13 @@ async function deepseek(messages, { json = false, max_tokens = 900, temperature 
     let detail = '';
     try { detail = JSON.parse(body).error?.message || ''; } catch (_) {}
     const map = {
-      400: 'İstek geçersiz bulundu.',
+      400: 'DeepSeek isteği geçersiz buldu. Tekrar dene.',
       401: 'DeepSeek API anahtarı geçersiz.',
       402: 'DeepSeek hesabında yeterli bakiye yok.',
-      422: 'İstek parametreleri geçersiz.',
+      422: 'DeepSeek istek parametrelerini kabul etmedi. Tekrar dene.',
       429: 'DeepSeek hız sınırına takıldı, biraz sonra tekrar dene.',
     };
-    console.error(`[deepseek] ${r.status} ${detail}`);
+    console.error(`[deepseek] ${r.status} ${redact(detail).slice(0, 300)}`);
     throw httpErr(r.status >= 500 ? 502 : r.status, map[r.status] || 'DeepSeek şu an yanıt vermiyor.');
   }
   let j;
@@ -496,7 +509,7 @@ async function videoSubmit(b) {
   }
   const data = await r.json().catch(() => null);
   if (!r.ok) {
-    console.error(`[video] ${provider} ${r.status}`, JSON.stringify(data)?.slice(0, 300));
+    console.error(`[video] ${provider} ${r.status}`, redact(data).slice(0, 300));
     const msg = r.status === 401 || r.status === 403 ? 'Video sağlayıcısı anahtarı geçersiz.' : r.status === 402 ? 'Video sağlayıcısı hesabında yeterli bakiye yok.' : r.status === 422 || r.status === 400 ? 'Video sağlayıcısı isteği reddetti. Komutu ya da görseli değiştirip tekrar dene.' : r.status === 429 ? 'Video sağlayıcısı yoğun, biraz sonra tekrar dene.' : 'Video sağlayıcısı şu an yanıt vermiyor.';
     throw httpErr(r.status >= 500 ? 502 : r.status, msg);
   }
@@ -625,7 +638,7 @@ async function metaAdsExchange(b) {
   try { r = await fetch(u, { signal: AbortSignal.timeout(15000) }); } catch (_) { throw httpErr(502, 'Meta’ya ulaşılamadı.'); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.access_token) {
-    console.warn('[meta-ads] exchange', r.status, j.error?.code, j.error?.message);
+    console.warn('[meta-ads] exchange', r.status, j.error?.code, redact(j.error?.message || '').slice(0, 300));
     throw httpErr(502, 'Meta anahtarı uzatılamadı. Uygulama kimliği ile gizli anahtarın eşleştiğinden emin ol.');
   }
   return { token: j.access_token, expires_in: Number(j.expires_in) || 0 };
@@ -720,7 +733,7 @@ const server = http.createServer(async (req, res) => {
     send(res, 405, { error: 'Bu yöntem desteklenmiyor.' });
   } catch (e) {
     if (e instanceof URIError) e = httpErr(400, 'Geçersiz adres.');
-    if (!e.status) console.error(e);
+    if (!e.status) console.error('[hata]', redact(e));
     if (res.headersSent) return res.destroy();
     if (e.status === 413) res.setHeader('Connection', 'close'); // okunmayan gövdeyi beklemeden bağlantıyı kapat
     send(res, e.status || 500, { error: e.status ? e.message : 'Sunucu hatası.' });
@@ -731,7 +744,7 @@ const server = http.createServer(async (req, res) => {
 server.headersTimeout = 20000;
 server.requestTimeout = 120000;
 
-process.on('unhandledRejection', (e) => console.error('[hata] yakalanmamış söz:', e));
+process.on('unhandledRejection', (e) => console.error('[hata] yakalanmamış söz:', redact(e)));
 // Render/Railway yeniden başlatırken (SIGTERM) açık istekleri bitir, sonra çık
 for (const sig of ['SIGTERM', 'SIGINT']) process.once(sig, () => {
   console.log(`[sunucu] ${sig} alındı, kapanıyor…`);
