@@ -1,7 +1,36 @@
 # Durum — x
 
 ## 16 Kasım (2. gün)
-Henüz başlamadı. Görevler: otomasyon/AJANLAR.md → "16 Kasım" tablosu.
+Son güncelleme: 16 Kasım 2026, ~07:40 (İstanbul) · dal `ajan/x` · 3 görevin üçü de tamamlandı, testler geçiyor.
+
+### Yapılanlar
+1. **Görselli X gönderisi**
+   - Belge doğrulandı (docs.x.com, 16 Kasım): `POST https://api.x.com/2/media/upload` tek istek; JSON gövde `{media: <base64>, media_category: "tweet_image"}` (multipart da olur), scope **`media.write`**, yanıt `data.id`; `tweet_image` JPG/PNG/GIF/WEBP, en fazla 5 MB. Gönderi: `POST /2/tweets` `{text, media:{media_ids:[id]}}` (en fazla 4 foto). Eski `command=INIT/APPEND/FINALIZE` biçimi artık kullanılmıyor; video için ayrı `/2/media/upload/initialize|append|finalize` var (kapsam dışı).
+   - `x-api.js`: `SCOPES`'a `media.write` eklendi. `/api/x/post` isteğe bağlı `media` alır: yalnızca bu sunucunun `/media/<32 hex>.jpg` dosyası (adres ya da ad) kabul edilir, dosya diskten (`UPLOADS_DIR` / `uploads`) okunur — dış adres indirilmez (SSRF yok). 5 MB denetimi, yükleme hataları Türkçe (403 → "yeniden bağlan, görsel izni gerekiyor"). Metinsiz, yalnızca görselli gönderiye de izin var. Yanıtta `media: true/false`. `server.js`'e dokunulmadı.
+   - `public/x.js`: `publish(text, {media})`; bağlantının `scope`'unda `media.write` yoksa görselli paylaşım sunucuya gitmeden "yeniden bağlan" hatası verir. **Eski bağlantılar**: kartta "Görselli gönderi için yeni bir izin gerekiyor. X’e yeniden bağlan; metin paylaşımı çalışmaya devam eder." + "Yeniden bağlan" düğmesi, durum rozeti "Yeniden bağlan". Yeniden bağlanınca eski refresh token sessizce iptal edilir. Yeni yardımcılar: `scopeOld()`, `canMedia()`, `native()`, `nativeMsg`, `reset()`.
+   - `index.html`: X platformunda görsel alanı görünür (isteğe bağlı); modal notu görsel/izin/video durumuna göre değişir; "X’te paylaş" görseli gönderir; izin eskiyse "Görselsiz, yalnızca metin paylaşılsın mı?" onayı; video ekliyse X’e yalnızca metin gider (uyarılı). Yalnızca metin akışı aynen çalışıyor.
+2. **resetAll**: "Verileri sıfırla" artık `GX.reset()` çağırıyor → `localStorage.glowX` silinir, bellekteki bağlantı sıfırlanır, X’teki izin sessizce iptal edilir.
+3. **Mobil (capacitor://)**: `window.Capacitor.isNativePlatform()` ya da `capacitor:`/`ionic:` protokolünde X kartı bağlan düğmesi yerine "X bağlantısı web sürümünden yapılmalı. Mobil uygulamada X girişi henüz desteklenmiyor; X’te paylaşmak için Glow’u tarayıcıda aç." gösterir; `connect()` de aynı mesajla durur; modal notu da bunu söyler.
+- **Testler**: `x-baglanti.mjs` (sahte X: görselli gönderi, metinsiz görsel, metin akışında `media` yok, dış adres 400, olmayan dosya 400, izinsiz 403 + "yeniden bağlan"); yeni `x-arayuz.mjs` (x.js vm içinde: eski izin, canMedia, engelleme, reset, Capacitor, resetAll→GX.reset). Hepsi geçiyor.
+- Playwright ile uçtan uca denendi (sahte X): eski izinli hesapta modal notu + "yalnızca metin" onayı; yeni izinli hesapta "görseliyle birlikte" onayı → `/2/media/upload` (base64 JPEG) → `/2/tweets` `media_ids:["555"]` → "X’te paylaşıldı" + `yayinlar.x` kaydı; sayfa hatası yok.
+
+### Kalanlar
+- X’e video gönderimi (chunked `/2/media/upload/initialize` → `append` → `finalize` → `GET` durum). Bugün kapsam dışı; şu an video ekliyse yalnızca metin gider.
+- Mobil uygulamada gerçek X girişi (sistem tarayıcısı + deep link + uygulamaya özel redirect). Şimdilik yalnızca uyarı. Not: Capacitor uygulamasının localStorage’ı web’den ayrı olduğu için web’de bağlanmak uygulamaya taşınmaz.
+- Görsel için alt metin (`/2/media/metadata`) eklenebilir.
+
+### Kararlar
+- Tek istekli `POST /2/media/upload` (JSON + base64) seçildi: içerik görselleri en fazla 1440 px JPEG, 5 MB altında; chunked akışa gerek yok.
+- Görsel sunucu diskinden okunur, URL indirilmez (güvenlik + PUBLIC_URL’in internetten erişilebilir olması gerekmez).
+- Eski izinli bağlantı zorla koparılmadı: metin paylaşımı çalışmaya devam eder, yalnızca görselli paylaşımda ve kartta "yeniden bağlan" istenir.
+- `resetAll`’da X izni de iptal ediliyor (best-effort), çünkü "tüm veriler silinsin" diyen kullanıcı bağlantının da kalkmasını bekler.
+- index.html’de yalnızca X’e ait satırlar ve `resetAll`’a tek satır eklendi (arayuz ajanı ile çakışmayı azaltmak için).
+
+### Kullanıcının yapması gerekenler
+1. X Developer Portal’da uygulama izni **Read and write** olmalı (görsel yükleme `media.write` scope’u ile istenir; portalda ayrıca bir ayar gerekmez, ama izin "Read" ise yükleme 403 verir).
+2. Daha önce X’e bağlanmış hesaplar Bağlantılar → X → **Yeniden bağlan** demeli (yeni görsel izni). Metin paylaşımı bu arada çalışır.
+3. Görsel yüklemek için sunucuda `PUBLIC_URL` tanımlı olmalı (mevcut `/api/media` şartı).
+4. 15 Kasım listesindeki adımlar (aşağıda) geçerli: `X_CLIENT_ID`/`X_CLIENT_SECRET`, callback adresi, ücretli/kredili API erişimi (görselli gönderi de "Content: Create" olarak ücretlendirilir).
 
 ---
 # 15 Kasım (1. gün) kaydı
