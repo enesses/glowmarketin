@@ -1014,6 +1014,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
 <li>Hiçbir gönderi veya yanıt, siz “Yayınla” ya da “Yanıtla” demeden paylaşılmaz.</li>
 <li><b>Görseller:</b> Instagram, gönderi görselini herkese açık bir adresten okumayı zorunlu tutar. Bu nedenle eklediğiniz fotoğraf JPEG’e çevrilir, tahmin edilemeyen rastgele bir adla sunucumuzda barındırılır ve <b>14 gün sonra otomatik olarak silinir</b>. Adresi bilen herkes görseli bu süre içinde görüntüleyebilir; yayınlanacak gönderiler için zaten herkese açık olacak görseller kullanın.</li>
 <li>Meta’dan aldığımız verileri reklam amacıyla kullanmayız, satmayız ve yapay zekâ modeli eğitmek için kullanmayız. Yorum yanıtı taslağı istediğinizde, yalnızca ilgili yorum ve gönderi metni 3. bölümde açıklandığı şekilde işlenir.</li>
+<li id="gizlilik-meta-reklam"><b>Meta reklam verileri:</b> “Meta Reklamları” bağlantısını ayrıca kurarsanız <code>ads_read</code>, <code>ads_management</code> ve <code>business_management</code> izinleriyle reklam hesaplarınızın adını ve para birimini, kampanyalarınızı (ad, durum, bütçe) ve son 7/30 günün istatistiklerini (harcama, gösterim, erişim, tıklama, TO, TBM) okuruz; yalnızca siz istediğinizde, seçtiğiniz gönderiden <b>duraklatılmış</b> bir taslak kampanya oluştururuz (konum hedeflemesi için şehir aramanız da Meta’ya gönderilir). Glow hiçbir reklamı yayına almaz ve bütçe harcatmaz. Bu veriler ve reklam erişim belirteci <b>yalnızca sizin tarayıcınızda</b> tutulur, sunucumuzda saklanmaz; sunucumuz yalnızca, yapılandırıldıysa, kısa süreli belirteci uzun süreliyle değiştirmek için belirteci kaydetmeden Meta’ya iletir.</li>
 </ul>
 <p>Bağlantıyı uygulamadaki <b>Bağlantılar → Bağlantıyı kes</b> ile, izni tamamen kaldırmak için Facebook’ta <b>Ayarlar ve gizlilik → Ayarlar → İşletme entegrasyonları</b> bölümünden Glow Marketing’i kaldırarak sonlandırabilirsiniz. Meta verilerinizin silinmesi için 8. bölümdeki adımları izleyin.</p>
 
@@ -1026,7 +1027,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
 <tr><td>DeepSeek (Hangzhou DeepSeek Artificial Intelligence Co., Ltd.)</td><td>Yapay zekâ ile metin taslağı üretme</td><td>İşletme profil bilgileri, yanıtlanacak yorumun metni ve puanı, yorum sahibinin yalnızca adı, müşteri sorusu, kullanıcının yazdığı notlar</td><td>Çin Halk Cumhuriyeti</td></tr>
 <tr><td>Google LLC</td><td>Google İşletme Profili bağlantısı, Google ile oturum açma, yazı tipleri</td><td>Bağlı işletme profilinin yorumları ve gönderileri, erişim belirteci, IP adresi ve tarayıcı bilgisi</td><td>ABD ve Google’ın veri merkezleri</td></tr>
 <tr><td>fal.ai (Features &amp; Labels, Inc.) veya OpenRouter, Inc. — ByteDance Seedance modeli</td><td>AI video üretimi (yalnızca Max paketi)</td><td>Video komutu ve, eklediyseniz, başlangıç fotoğrafı</td><td>ABD</td></tr>
-<tr><td>Meta Platforms Ireland Ltd. / Meta Platforms, Inc.</td><td>Facebook sayfası ve Instagram işletme hesabı bağlantısı: gönderi yayınlama, yorumları okuma ve yanıtlama</td><td>Bağlı sayfa ve Instagram hesabının gönderileri, gönderilere gelen yorumlar (yorum sahibinin görünen adı veya kullanıcı adı), erişim belirteci</td><td>İrlanda, ABD ve Meta’nın veri merkezleri</td></tr>
+<tr><td>Meta Platforms Ireland Ltd. / Meta Platforms, Inc.</td><td>Facebook sayfası ve Instagram işletme hesabı bağlantısı: gönderi yayınlama, yorumları okuma ve yanıtlama</td><td>Bağlı sayfa ve Instagram hesabının gönderileri, gönderilere gelen yorumlar (yorum sahibinin görünen adı veya kullanıcı adı), erişim belirteci. Meta Reklamları bağlıysa: reklam hesabı, kampanya ve istatistik verileri ile oluşturmasını istediğiniz duraklatılmış taslak kampanyanın bilgileri (bu reklam verileri yalnızca tarayıcınızda tutulur, sunucumuzda saklanmaz)</td><td>İrlanda, ABD ve Meta’nın veri merkezleri</td></tr>
 <tr><td>X Corp.</td><td>X (Twitter) hesabı bağlantısı: gönderi paylaşma</td><td>Bağlı X hesabının kullanıcı adı ve görünen adı, paylaşmak istediğiniz gönderi metni, erişim belirteci (yalnızca tarayıcınızda saklanır)</td><td>ABD ve X’in veri merkezleri</td></tr>
 <tr><td><mark class="ph">[ÖDEME KURULUŞU]</mark></td><td>Abonelik ödemelerinin tahsili</td><td>Ad, e-posta, fatura bilgileri, ödeme işlem kayıtları (kart bilgileri bize ulaşmaz)</td><td>Türkiye</td></tr>
 </tbody></table></div>
@@ -1938,6 +1939,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     }
     else if(pf==='x') not=!GX?'X için metni kopyalayıp uygulamada paylaşabilirsin.':c?.yayinlar?.x?`X’te paylaşıldı · ${tarihFmt(c.yayinlar.x.tarih)}. Aynı metni tekrar paylaşmak X’te reddedilebilir.`:GX.connected()?(icerikVideo?'X’e video gönderimi henüz yok; yalnızca metin paylaşılır.':icerikGorsel&&!GX.canMedia()?'Görselli paylaşım için Bağlantılar sayfasından X’e yeniden bağlan (yeni görsel izni).':`@${GX.username()} hesabında ${icerikGorsel?'görselle ':''}paylaşılır. En fazla 280 karakter; bağlantılar 23, emoji 2 sayılır.`):GX.expired()?'X bağlantısının süresi dolmuş. Bağlantılar sayfasından yeniden bağlan.':GX.native()?GX.nativeMsg:'X’te paylaşmak için Bağlantılar sayfasından X hesabını bağla.';
     $('icerikGoogleNot').textContent=not;
+    maIcerikKisayol(c,pf); // meta-ads: yayınlanmış gönderi için "Reklam taslağı" kısayolu
     const gAlan=$('gorselAlan'); gAlan.classList.toggle('hidden',!(pf==='instagram'||pf==='facebook'||(pf==='x'&&GX)));
     renderGorselKutu(pf);
   }
@@ -2775,7 +2777,8 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
      kampanya listesi ve yayınlanmış bir gönderiyi DURAKLATILMIŞ (PAUSED) taslak kampanya olarak öne çıkarma.
      Kural: bu kod asla ACTIVE kampanya/reklam seti/reklam oluşturmaz ve durum değiştirmez; yayına alma Ads Manager'da kullanıcıdadır. */
   const MA_SCOPES=['ads_read','ads_management','business_management'];
-  const MA={hesaplar:null,ozet:null,kampanyalar:null,donem:'last_7d',yukleniyor:false,hata:'',taslak:null};
+  const MA={hesaplar:null,ozet:null,kampanyalar:null,donem:'last_7d',yukleniyor:false,hata:'',taslak:null,sehirler:[],geo:null,uygun:{},secili:'',form:null};
+  const MA_YARICAP={min:17,max:80,vars:25}; // Meta: şehir çevresi 17–80 km (10–50 mil)
   const MA_DONEM={last_7d:'Son 7 gün',last_30d:'Son 30 gün'};
   const MA_KURUSSUZ=['CLP','COP','CRC','HUF','ISK','IDR','JPY','KRW','PYG','TWD','VND'];
   const MA_HESAP_DURUM={1:'Aktif',2:'Devre dışı',3:'Ödeme sorunu',7:'İncelemede',8:'Ödeme bekleniyor',9:'Ek süre',100:'Kapanıyor',101:'Kapalı',201:'Aktif',202:'Kapalı'};
@@ -2840,7 +2843,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   }
   async function maDisconnect(){
     if(!await confirmAsk({title:'Meta Reklamları bağlantısı kesilsin mi?',text:'Reklam hesabındaki kampanyalar etkilenmez; yalnızca bu uygulama erişimini kaybeder. İzni tamamen kaldırmak için Facebook → Ayarlar → İşletme entegrasyonları’ndan Glow’u kaldırabilirsin.',ok:'Bağlantıyı kes',danger:true})) return;
-    appData.metaAds=null; MA.ozet=null; MA.kampanyalar=null; MA.taslak=null; save(); renderBaglantilar(); toast('Meta Reklamları bağlantısı kesildi.');
+    appData.metaAds=null; MA.ozet=null; MA.kampanyalar=null; MA.taslak=null; MA.sehirler=[]; MA.geo=null; MA.uygun={}; MA.form=null; save(); renderBaglantilar(); toast('Meta Reklamları bağlantısı kesildi.');
   }
   async function maYenile(){
     if(!maConnected()||MA.yukleniyor) return;
@@ -2864,6 +2867,63 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     (appData.icerikler||[]).forEach((c,i)=>{ ['facebook','instagram'].forEach(pf=>{ const y=c.yayinlar?.[pf]; if(y&&y.id) out.push({i,pf,id:String(y.id),tarih:y.tarih,metin:String(c.metin||'').slice(0,70)}); }); });
     return out.sort((a,b)=>String(b.tarih).localeCompare(String(a.tarih))).slice(0,30);
   }
+
+  const maKey=g=>g.pf+':'+g.id;
+  function maSeciliGonderi(gon=maGonderiler()){ return gon.find(g=>maKey(g)===MA.secili)||gon[0]||null; }
+  function maFbId(g){ return g.id.includes('_')?g.id:`${appData.meta?.pageId}_${g.id}`; }
+  // Kart yeniden çizilmeden önce formdaki değerleri sakla (şehir arama vb. yeniden çizimde kaybolmasın)
+  function maFormOku(){ if(!$('maButce')) return; const v=id=>$(id)?.value; MA.form={butce:v('maButce'),gun:v('maGun'),yasMin:v('maYasMin'),yasMax:v('maYasMax'),yaricap:v('maYaricap'),ara:v('maSehirAra')}; }
+  function maFv(k,d){ const f=MA.form?.[k]; return f!=null&&f!==''?f:(MA.taslak?.[k]??d); }
+  function maRender(){ maFormOku(); if(current==='baglantilar') renderBaglantilar(); }
+  // Şehir hedefleme: Targeting Search (GET /search?type=adgeolocation&location_types=["city"]&country_code=TR)
+  async function maSehirAra(){
+    maFormOku(); const q=String(MA.form?.ara||'').trim();
+    if(q.length<2) return toast('Aramak için en az 2 harf yaz.',true);
+    MA.geo={yukleniyor:true}; maRender();
+    try{
+      const j=await maApi('search',{params:{type:'adgeolocation',location_types:'["city"]',q,country_code:'TR',limit:'10'}});
+      MA.geo={sonuc:(j.data||[]).filter(x=>x&&x.key&&x.type==='city').map(x=>({key:String(x.key),name:String(x.name||''),region:String(x.region||'')}))};
+    }catch(e){ MA.geo={hata:e.message}; }
+    maRender(); setTimeout(()=>$('maSehirAra')?.focus({preventScroll:true}),0);
+  }
+  function maSehirEkle(k){
+    const s=MA.geo?.sonuc?.[k]; if(!s) return;
+    if(MA.sehirler.some(x=>x.key===s.key)) return toast('Bu şehir zaten ekli.');
+    if(MA.sehirler.length>=25) return toast('En fazla 25 şehir eklenebilir.',true);
+    MA.sehirler.push(s); MA.geo=null; const i=$('maSehirAra'); if(i) i.value=''; maRender();
+  }
+  // Öne çıkarma ön kontrolü (sayfa anahtarıyla): FB gönderisi is_eligible_for_promotion (+promotable_id), IG medyası boost_eligibility_info.eligible_to_boost
+  async function maUygunluk(g,zorla){
+    const k=maKey(g); if(!zorla&&MA.uygun[k]&&MA.uygun[k].durum!=='hata') return MA.uygun[k];
+    MA.uygun[k]={durum:'bekliyor'}; maRender();
+    let u;
+    try{
+      if(g.pf==='facebook'){
+        const pid=maFbId(g), j=await mApi(pid,{params:{fields:'is_eligible_for_promotion,promotable_id'}});
+        if(j.is_eligible_for_promotion===false){
+          u=j.promotable_id&&String(j.promotable_id)!==pid
+            ?{durum:'uygun',promotableId:String(j.promotable_id),neden:'Bu gönderi doğrudan öne çıkarılamıyor; Meta’nın önerdiği eşdeğer gönderi kullanılacak.'}
+            :{durum:'degil',neden:'Facebook bu gönderinin öne çıkarılmasına izin vermiyor. Olası nedenler: paylaşılmış (başkasına ait) içerik, gizlenmiş ya da silinmiş gönderi, telif veya reklam politikası kısıtlaması.'};
+        }else u={durum:'uygun'};
+      }else{
+        const j=await mApi(g.id,{params:{fields:'boost_eligibility_info'}}), b=j.boost_eligibility_info||{};
+        if(b.eligible_to_boost===false){
+          const det=Object.entries(b).filter(([x,v])=>x!=='eligible_to_boost'&&v!=null&&v!=='').map(([,v])=>typeof v==='object'?JSON.stringify(v):String(v)).join(' · ');
+          u={durum:'degil',neden:'Instagram bu gönderinin reklam olarak öne çıkarılmasına izin vermiyor'+(det?': '+det:'. Olası nedenler: telifli müzik, ürün etiketi, iş birliği/marka içeriği izni ya da politika kısıtlaması.')};
+        }else u={durum:'uygun'};
+      }
+    }catch(e){ u={durum:'hata',neden:e.message}; }
+    MA.uygun[k]=u; maRender(); return u;
+  }
+  // İçerik modalı kısayolu: yayınlanmış FB/IG gönderisi için "Reklam taslağı" → Bağlantılar'daki Meta Reklamları kartı
+  function maIcerikKisayol(c,pf){
+    const not=$('icerikGoogleNot'); if(!not) return;
+    let b=$('maKisayol');
+    const y=(pf==='facebook'||pf==='instagram')&&c?.yayinlar?.[pf];
+    if(!(y&&y.id)){ if(b) b.remove(); return; }
+    if(!b){ b=document.createElement('button'); b.type='button'; b.id='maKisayol'; b.className='btn btn-ghost btn-sm'; b.style.alignSelf='flex-start'; b.style.marginTop='6px'; b.dataset.action='ma-kisayol'; b.textContent='Reklam taslağı'; not.insertAdjacentElement('afterend',b); }
+    b.dataset.k=pf+':'+String(y.id); b.title='Bu gönderiyi duraklatılmış taslak reklam olarak hazırla';
+  }
   function maCard(){
     const a=appData.metaAds, mmok=mConnected();
     let body;
@@ -2876,7 +2936,8 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       const o=MA.ozet, cur=a.currency, act=String(a.adAccountId).replace(/^act_/,'');
       const tiles=o?[['Harcama',maPara(o.spend,cur)],['Gösterim',maSayi(o.impressions)],['Tıklama',maSayi(o.clicks)],['TO (CTR)',o.ctr?Number(o.ctr).toLocaleString('tr-TR',{maximumFractionDigits:2})+' %':'—'],['TBM (CPC)',o.cpc?maPara(o.cpc,cur):'—']]:[];
       const kamp=MA.kampanyalar;
-      const gon=maGonderiler(), t=MA.taslak;
+      const gon=maGonderiler(), t=MA.taslak, sg=mmok?maSeciliGonderi(gon):null, u=sg?MA.uygun[maKey(sg)]:null;
+      if(sg&&!u) setTimeout(()=>maUygunluk(sg),0);
       body=`<div class="conn-loc"><strong>${esc(a.adAccountName)}</strong><span>Reklam hesabı · ${esc(cur)}${a.uzun?'':' · kısa süreli oturum'}</span></div>
         ${maExpired()?'<p class="warn-line">Reklam bağlantısının süresi dolmuş. Yeniden bağlan.</p>':''}
         <div class="seg" id="maDonem" role="group" aria-label="Dönem">${Object.entries(MA_DONEM).map(([k,v])=>`<button type="button" data-v="${k}" data-action="ma-donem" class="${MA.donem===k?'on':''}">${v}</button>`).join('')}</div>
@@ -2888,15 +2949,22 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
           ${t&&t.adId?`<p class="hint" style="color:var(--ink-2)"><b>Taslak hazır:</b> “${esc(t.ad)}” kampanyası <b>duraklatılmış</b> olarak oluşturuldu. Harcama başlamaz; incelemek ve yayına almak için <a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${esc(act)}&selected_campaign_ids=${esc(t.campaignId)}" target="_blank" rel="noopener" style="color:var(--accent-ink);font-weight:700">Ads Manager</a>’ı aç.</p>`:''}
           ${t&&t.hata?`<p class="warn-line">${esc(t.hata)}</p>`:''}
           ${!mmok?'<p class="hint">Öne çıkarmak için önce Instagram ve Facebook kartından sayfanı bağla ve bir gönderi yayınla.</p>':!gon.length?'<p class="hint">Henüz Glow’dan Facebook ya da Instagram’da yayınlanmış bir gönderi yok. İçerik takviminden bir gönderi yayınla, burada görünsün.</p>':`
-          <div class="field"><label for="maGonderi">Gönderi</label><select id="maGonderi">${gon.map((g,k)=>`<option value="${k}">${g.pf==='instagram'?'Instagram':'Facebook'} · ${esc(tarihFmt(g.tarih))} · ${esc(g.metin||'(metinsiz)')}</option>`).join('')}</select></div>
+          <div class="field"><label for="maGonderi">Gönderi</label><select id="maGonderi">${gon.map((g,k)=>`<option value="${k}"${sg&&maKey(g)===maKey(sg)?' selected':''}>${g.pf==='instagram'?'Instagram':'Facebook'} · ${esc(tarihFmt(g.tarih))} · ${esc(g.metin||'(metinsiz)')}</option>`).join('')}</select>
+            ${!u||u.durum==='bekliyor'?'<span class="hint">Öne çıkarma uygunluğu denetleniyor…</span>':u.durum==='uygun'?`<span class="hint" style="color:var(--good)">✓ Öne çıkarmaya uygun.${u.neden?' '+esc(u.neden):''}</span>`:u.durum==='degil'?`<p class="warn-line" id="maUygunNeden">${esc(u.neden)}</p>`:`<span class="hint">Uygunluk denetlenemedi (${esc(u.neden)}). Taslak yine de denenebilir; Meta uygun değilse reddeder. <button type="button" class="btn btn-quiet btn-sm" data-action="ma-uygun-tekrar">Tekrar denetle</button></span>`}</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
-            <div class="field"><label for="maButce">Günlük bütçe (${esc(cur)})</label><input id="maButce" type="number" inputmode="decimal" min="1" step="1" value="${esc(String(t?.butce||100))}"></div>
-            <div class="field"><label for="maGun">Süre (gün)</label><input id="maGun" type="number" inputmode="numeric" min="1" max="30" value="${esc(String(t?.gun||7))}"></div>
-            <div class="field"><label for="maYasMin">Yaş (en az)</label><input id="maYasMin" type="number" inputmode="numeric" min="18" max="65" value="${esc(String(t?.yasMin||18))}"></div>
-            <div class="field"><label for="maYasMax">Yaş (en çok)</label><input id="maYasMax" type="number" inputmode="numeric" min="18" max="65" value="${esc(String(t?.yasMax||65))}"></div>
+            <div class="field"><label for="maButce">Günlük bütçe (${esc(cur)})</label><input id="maButce" type="number" inputmode="decimal" min="1" step="1" value="${esc(String(maFv('butce',100)))}"></div>
+            <div class="field"><label for="maGun">Süre (gün)</label><input id="maGun" type="number" inputmode="numeric" min="1" max="30" value="${esc(String(maFv('gun',7)))}"></div>
+            <div class="field"><label for="maYasMin">Yaş (en az)</label><input id="maYasMin" type="number" inputmode="numeric" min="18" max="65" value="${esc(String(maFv('yasMin',18)))}"></div>
+            <div class="field"><label for="maYasMax">Yaş (en çok)</label><input id="maYasMax" type="number" inputmode="numeric" min="18" max="65" value="${esc(String(maFv('yasMax',65)))}"></div>
           </div>
-          <p class="hint">Hedef: Türkiye · etkileşim kampanyası. Kampanya, reklam seti ve reklam <b>DURAKLATILMIŞ</b> oluşturulur; Glow asla reklam yayınlamaz ve bütçe harcatmaz. Yayına almak Ads Manager’da senin kararın. Reklamlar Meta’nın reklam politikalarına göre incelenir.</p>
-          <div><button class="btn btn-primary btn-sm" data-action="ma-boost">Duraklatılmış taslak oluştur</button></div>`}
+          <div class="field"><label for="maSehirAra">Konum</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="maSehirAra" type="search" placeholder="Şehir ya da ilçe ara (ör. Kadıköy)" autocomplete="off" value="${esc(String(MA.form?.ara||''))}" style="flex:1;min-width:160px"><button type="button" class="btn btn-ghost btn-sm" data-action="ma-sehir-ara">Ara</button></div>
+            ${MA.geo?.yukleniyor?'<span class="hint">Aranıyor…</span>':MA.geo?.hata?`<p class="warn-line">${esc(MA.geo.hata)}</p>`:MA.geo?.sonuc?(MA.geo.sonuc.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${MA.geo.sonuc.map((x,k)=>`<button type="button" class="btn btn-ghost btn-sm" data-action="ma-sehir-ekle" data-k="${k}">+ ${esc(x.name)}${x.region&&x.region!==x.name?' · '+esc(x.region):''}</button>`).join('')}</div>`:'<span class="hint">Türkiye’de bu adla bir şehir bulunamadı.</span>'):''}
+            ${MA.sehirler.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${MA.sehirler.map((x,k)=>`<span class="live-chip">${esc(x.name)} <button type="button" data-action="ma-sehir-sil" data-k="${k}" aria-label="${esc(x.name)} kaldır" style="border:0;background:none;cursor:pointer;font-weight:800;padding:0 2px">×</button></span>`).join('')}</div>
+              <div class="field" style="max-width:220px;margin-top:6px"><label for="maYaricap">Çevre yarıçapı (km)</label><input id="maYaricap" type="number" inputmode="numeric" min="${MA_YARICAP.min}" max="${MA_YARICAP.max}" value="${esc(String(maFv('yaricap',MA_YARICAP.vars)))}"><span class="hint">Meta sınırı: ${MA_YARICAP.min}–${MA_YARICAP.max} km.</span></div>`:'<span class="hint">Şehir eklemezsen hedef Türkiye geneli olur.</span>'}
+          </div>
+          <p class="hint">Hedef: ${MA.sehirler.length?esc(MA.sehirler.map(x=>x.name).join(', '))+' ve çevresi':'Türkiye geneli'} · etkileşim kampanyası. Kampanya, reklam seti ve reklam <b>DURAKLATILMIŞ</b> oluşturulur; Glow asla reklam yayınlamaz ve bütçe harcatmaz. Yayına almak Ads Manager’da senin kararın. Reklamlar Meta’nın reklam politikalarına göre incelenir.</p>
+          <div><button class="btn btn-primary btn-sm" data-action="ma-boost"${u&&(u.durum==='degil'||u.durum==='bekliyor')?' disabled':''}>Duraklatılmış taslak oluştur</button></div>`}
         </div>`;
     }else{
       body=`<p class="muted" style="font-size:14px">Reklam hesabını bağladığında son 7/30 günün harcama, gösterim, tıklama, TO ve TBM özetini burada görürsün; yayınladığın bir gönderiyi tek tıkla <b>duraklatılmış taslak</b> kampanyaya çevirirsin.</p>
@@ -2918,6 +2986,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   }
   async function maBoost(btn){
     if(!maConnected()) return;
+    maFormOku();
     const a=appData.metaAds, m=appData.meta, g=maGonderiler()[Number($('maGonderi')?.value)];
     const butce=Number($('maButce').value), gun=Math.round(Number($('maGun').value)), yasMin=Math.round(Number($('maYasMin').value)), yasMax=Math.round(Number($('maYasMax').value));
     if(!g) return toast('Bir gönderi seç.',true);
@@ -2925,8 +2994,18 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     if(!(gun>=1&&gun<=30)) return toast('Süre 1-30 gün olmalı.',true);
     if(!(yasMin>=18&&yasMax<=65&&yasMin<=yasMax)) return toast('Yaş aralığı 18-65 arasında olmalı.',true);
     if(g.pf==='instagram'&&!m?.igId) return toast('Instagram hesabı bağlı değil.',true);
-    MA.taslak={butce,gun,yasMin,yasMax};
-    const ok=await confirmAsk({title:'Duraklatılmış taslak oluşturulsun mu?',text:`${a.adAccountName} hesabında, günlük ${maPara(butce,a.currency)} bütçeli, ${gun} günlük bir etkileşim kampanyası DURAKLATILMIŞ olarak oluşturulacak. Sen Ads Manager’da yayına almadıkça hiçbir ücret oluşmaz.`,ok:'Taslağı oluştur',check:'Kampanyanın duraklatılmış oluşturulacağını ve yayına alırsam Meta reklam politikalarına uymaktan sorumlu olduğumu anlıyorum.'});
+    const yaricap=Math.round(Number(MA.form?.yaricap||MA_YARICAP.vars));
+    if(MA.sehirler.length&&!(yaricap>=MA_YARICAP.min&&yaricap<=MA_YARICAP.max)) return toast(`Çevre yarıçapı ${MA_YARICAP.min}-${MA_YARICAP.max} km olmalı.`,true);
+    MA.secili=maKey(g);
+    busy(btn,true,'Uygunluk denetleniyor…');
+    const uy=await maUygunluk(g);
+    if(btn.isConnected) busy(btn,false);
+    if(uy.durum==='degil') return toast(uy.neden,true);
+    btn=document.querySelector('[data-action="ma-boost"]')||btn;
+    const geo=MA.sehirler.length?{cities:MA.sehirler.map(x=>({key:x.key,radius:yaricap,distance_unit:'kilometer'}))}:{countries:['TR']};
+    const hedefMetin=MA.sehirler.length?MA.sehirler.map(x=>x.name).join(', ')+` (±${yaricap} km)`:'Türkiye geneli';
+    MA.taslak={butce,gun,yasMin,yasMax,yaricap};
+    const ok=await confirmAsk({title:'Duraklatılmış taslak oluşturulsun mu?',text:`${a.adAccountName} hesabında, günlük ${maPara(butce,a.currency)} bütçeli, ${gun} günlük bir etkileşim kampanyası (hedef: ${hedefMetin}) DURAKLATILMIŞ olarak oluşturulacak. Sen Ads Manager’da yayına almadıkça hiçbir ücret oluşmaz.`,ok:'Taslağı oluştur',check:'Kampanyanın duraklatılmış oluşturulacağını ve yayına alırsam Meta reklam politikalarına uymaktan sorumlu olduğumu anlıyorum.'});
     if(!ok) return;
     const off=MA_KURUSSUZ.includes(a.currency)?1:100, act=a.adAccountId;
     const tarih=new Date().toLocaleDateString('tr-TR'), ad=`Glow · ${g.pf==='instagram'?'Instagram':'Facebook'} gönderisi · ${tarih}`;
@@ -2940,12 +3019,12 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       busy(btn,true,'Reklam seti hazırlanıyor…');
       // 2) Reklam seti — PAUSED; bütçe hesabın para biriminin alt birimiyle
       const s=await maApi(`${act}/adsets`,{method:'POST',params:{name:ad+' · set',campaign_id:campaignId,status:'PAUSED',daily_budget:String(Math.round(butce*off)),billing_event:'IMPRESSIONS',optimization_goal:'POST_ENGAGEMENT',destination_type:'ON_POST',bid_strategy:'LOWEST_COST_WITHOUT_CAP',start_time:bas.toISOString(),end_time:bit.toISOString(),
-        targeting:JSON.stringify({geo_locations:{countries:['TR']},age_min:yasMin,age_max:yasMax,targeting_automation:{advantage_audience:0}})}});
+        targeting:JSON.stringify({geo_locations:geo,age_min:yasMin,age_max:yasMax,targeting_automation:{advantage_audience:0}})}});
       busy(btn,true,'Reklam hazırlanıyor…');
       // 3) Kreatif — mevcut gönderi (Facebook: object_story_id, Instagram: source_instagram_media_id)
       const kp=g.pf==='instagram'
         ?{name:ad,object_id:m.pageId,instagram_user_id:m.igId,source_instagram_media_id:g.id}
-        :{name:ad,object_story_id:g.id.includes('_')?g.id:`${m.pageId}_${g.id}`};
+        :{name:ad,object_story_id:uy.promotableId||maFbId(g)};
       const cr=await maApi(`${act}/adcreatives`,{method:'POST',params:kp});
       // 4) Reklam — PAUSED
       const r=await maApi(`${act}/ads`,{method:'POST',params:{name:ad,adset_id:s.id,creative:JSON.stringify({creative_id:cr.id}),status:'PAUSED'}});
@@ -2967,8 +3046,24 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       case 'ma-refresh': maYenile(); break;
       case 'ma-donem': if(MA.donem!==el.dataset.v){ MA.donem=el.dataset.v; MA.ozet=null; MA.kampanyalar=null; maYenile(); } break;
       case 'ma-boost': maBoost(el); break;
+      case 'ma-sehir-ara': maSehirAra(); break;
+      case 'ma-sehir-ekle': maSehirEkle(Number(el.dataset.k)); break;
+      case 'ma-sehir-sil': MA.sehirler.splice(Number(el.dataset.k),1); maRender(); break;
+      case 'ma-uygun-tekrar': { const g=maSeciliGonderi(); if(g) maUygunluk(g,true); break; }
+      case 'ma-kisayol': {
+        MA.secili=el.dataset.k||''; MA.taslak=null; closeModal(); go('baglantilar');
+        if(!maConnected()) toast('Reklam taslağı için önce Meta Reklamları kartından reklam hesabını bağla.');
+        setTimeout(()=>{ const k=$('maGonderi')||$('maKart'); if(k){ k.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}); if(k.id==='maGonderi') k.focus({preventScroll:true}); } },120);
+        break;
+      }
     }
   });
+  document.addEventListener('change',e=>{
+    if(e.target.id!=='maGonderi') return;
+    const g=maGonderiler()[Number(e.target.value)]; if(!g) return;
+    MA.secili=maKey(g); if(MA.taslak){ delete MA.taslak.adId; delete MA.taslak.hata; } maRender();
+  });
+  document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.id==='maSehirAra'){ e.preventDefault(); maSehirAra(); } });
 
   /* ---------- Bağlantılar sayfası ---------- */
   function renderBaglantilar(){

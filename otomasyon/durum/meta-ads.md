@@ -1,7 +1,31 @@
 # Durum — meta-ads
 
 ## 16 Kasım (2. gün)
-Henüz başlamadı. Görevler: otomasyon/AJANLAR.md → "16 Kasım" tablosu.
+Son güncelleme: 16 Kas 2026, 1. dalga (~08:00).
+
+### Yapılanlar
+- [x] **Şehir/ilçe hedefleme**: "Gönderiyi öne çıkar" formuna Konum alanı. Targeting Search `GET /search?type=adgeolocation&location_types=["city"]&country_code=TR&limit=10` (reklam anahtarıyla); sonuçtan şehir ekle/çıkar (en çok 25), ortak **çevre yarıçapı 17–80 km** (varsayılan 25). Şehir yoksa varsayılan **Türkiye geneli** (`countries:['TR']`); varsa `geo_locations.cities=[{key,radius,distance_unit:'kilometer'}]`. Onay penceresi ve özet satırı hedefi gösteriyor. Form değerleri yeniden çizimde korunuyor (`maFormOku`).
+- [x] **Uygunluk ön kontrolü** (sayfa anahtarıyla, gönderi seçilince otomatik + oluşturmadan hemen önce): FB `GET {sayfa_gönderi}?fields=is_eligible_for_promotion,promotable_id`; IG `GET {ig_media}?fields=boost_eligibility_info` → `eligible_to_boost`. Uygun değilse neden gösterilir ve buton devre dışı; denetim hata verirse uyarı + "Tekrar denetle", taslak denenebilir.
+- [x] **İçerik modalı "Reklam taslağı" kısayolu**: FB/IG'de yayınlanmış içerikte görünür → modal kapanır, Bağlantılar'a gidip Meta Reklamları kartında o gönderiyi seçer (reduced-motion'a uyar). Bağlı değilse uyarı verir. Paylaşılan koda tek satır: `updateIcerikGoogleUI` içinde `maIcerikKisayol(c,pf)`.
+- [x] **Gizlilik Politikası**: 5. bölüme "Meta reklam verileri" maddesi (`#gizlilik-meta-reklam`: ads_read/ads_management/business_management, hesap/kampanya/istatistik, yalnızca tarayıcıda, sunucuda saklanmaz, sunucu yalnızca belirteci kaydetmeden uzatır); 6. bölümdeki Meta satırına reklam verisi cümlesi.
+- [x] Test: `otomasyon/testler/meta-ads-hedefleme.mjs`. Playwright (390 px, sahte Graph yanıtlarıyla) uçtan uca: kısayol → doğru gönderi seçili; IG uygun değil → neden + buton kapalı; FB uygun; Kadıköy + 30 km → adset `cities` ile, kampanya/set/reklam **PAUSED**; JS hatası yok.
+
+### Kalanlar
+- [ ] Gerçek hesapla canlı deneme (anahtar yok): özellikle `boost_eligibility_info` yanıt yapısı ve şehir+yarıçap reklam seti.
+- [ ] İsteğe bağlı: `subcity`/bölge (il) hedefleme; şimdilik yalnızca `type=city`.
+
+### Kararlar
+- Resmi belge (Basic Targeting): şehir yarıçapı 10–50 mil / **17–80 km**; birim olarak km seçildi. Targeting Search `location_types` seçenekleri arasında `subcity` yok; Türkiye ilçeleri Meta'da çoğunlukla `city` olarak geçtiği için yalnızca `type==='city'` sonuçları gösteriliyor.
+- `boost_eligibility_info` alt alanları resmi sayfada ayrıntılı değil ("uygun değilse ek ayrıntılar içerir"); `eligible_to_boost` (RestFB `IgBoostEligibilityInfo`) kullanıldı, diğer alt alanlar neden olarak olduğu gibi gösteriliyor. FB'de `is_eligible_for_promotion=false` ama farklı `promotable_id` varsa kreatifte o kimlik kullanılıyor (belgede "doğrudan öne çıkarılamayan gönderiler için" tanımı).
+- Ön kontrol **sayfa anahtarıyla** yapılıyor (reklam anahtarında sayfa okuma izni yok). Denetim hata verirse engellemiyoruz; Meta zaten uygun olmayanı reddeder.
+- Gizlilik metni arayüz ajanının alanında olsa da bugünkü tablo bu görevi meta-ads'e verdi; yalnızca 5. bölüme yeni `<li>` ve 6. bölümdeki Meta hücresine cümle eklendi (yer tutuculara dokunulmadı).
+- Asla ACTIVE yok: yeni kod da yalnızca PAUSED oluşturuyor; test denetliyor.
+- Birleştirme denemesi (07:40): `main` + `ajan/sunucu` + `ajan/arayuz` + `ajan/x` + `ajan/meta-ads` geçici çalışma ağacında çakışmasız birleşti, smoke-test geçti. Bugünkü 4 görev tamamlandı; dalga erken bitirildi.
+
+### Kullanıcının yapması gerekenler
+1. (15 Kasım listesi geçerli) Marketing API ürünü, `ads_read/ads_management/business_management` Advanced Access, `.env` `META_APP_ID`/`META_APP_SECRET`.
+2. Uygunluk ön kontrolü sayfa bağlantısının izinleriyle çalışır (`pages_read_engagement`, `instagram_basic`); bunlar mevcut sayfa bağlantısında zaten isteniyor.
+3. Şehir hedefli bir taslağı Ads Manager'da açıp hedef kitle tahminini kontrol et, sonra **kendin** yayına al.
 
 ---
 # 15 Kasım (1. gün) kaydı
