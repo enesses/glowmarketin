@@ -54,8 +54,16 @@ export default async (base, ok, bad) => {
       if (req.url.startsWith('/2/users/me')) return req.headers.authorization === 'Bearer AT1' ? j(200, { data: { id: '42', username: 'glowtest', name: 'Glow' } }) : j(401, { title: 'Unauthorized' });
       if (req.url === '/2/tweets') {
         if (req.headers.authorization !== 'Bearer AT2') return j(401, { title: 'Unauthorized' });
-        const b = JSON.parse(d); if (b.text === 'tekrar') return j(403, { detail: 'You are not allowed to create a Tweet with duplicate content.' });
+        const b = JSON.parse(d); if (b.media && JSON.stringify(b.media.media_ids) !== '["777"]') return j(400, { detail: 'bad media id' });
+        if (b.text === 'tekrar') return j(403, { detail: 'You are not allowed to create a Tweet with duplicate content.' });
         return j(201, { data: { id: '1999', text: b.text } });
+      }
+      if (req.url === '/2/media/upload') {
+        if (req.headers.authorization === 'Bearer ESKIIZIN') return j(403, { title: 'Forbidden', detail: 'missing scope media.write' });
+        if (req.headers.authorization !== 'Bearer AT2') return j(401, { title: 'Unauthorized' });
+        const b = JSON.parse(d);
+        if (b.media_category !== 'tweet_image' || !Buffer.from(b.media, 'base64').subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) return j(400, { detail: 'bad media' });
+        return j(200, { data: { id: '777', media_key: '3_777', size: 200 } });
       }
       if (req.url === '/2/oauth2/revoke') return j(200, { revoked: true });
       j(404, {});
@@ -63,7 +71,10 @@ export default async (base, ok, bad) => {
   });
   await new Promise((r) => mock.listen(0, '127.0.0.1', r));
   const PORT = 3998;
-  const env = { ...process.env, PORT: String(PORT), DEEPSEEK_API_KEY: '', PUBLIC_URL: 'https://alanadin.com', X_CLIENT_ID: 'cid', X_CLIENT_SECRET: 'sec', X_API_BASE: `http://127.0.0.1:${mock.address().port}`, X_REDIRECT_URIS: '' };
+  const up = fs.mkdtempSync(path.join(require('os').tmpdir(), 'glowx-'));
+  const IMG = 'ab'.repeat(16) + '.jpg';
+  fs.writeFileSync(path.join(up, IMG), Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200)]));
+  const env = { ...process.env, UPLOADS_DIR: up, PORT: String(PORT), DEEPSEEK_API_KEY: '', PUBLIC_URL: 'https://alanadin.com', X_CLIENT_ID: 'cid', X_CLIENT_SECRET: 'sec', X_API_BASE: `http://127.0.0.1:${mock.address().port}`, X_REDIRECT_URIS: '' };
   const srv = spawn(process.execPath, [path.join(root, 'server.js')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; srv.stdout.on('data', (d) => (log += d)); srv.stderr.on('data', (d) => (log += d));
   for (let i = 0; i < 40 && !log.includes('localhost'); i++) await wait(100);
@@ -83,9 +94,20 @@ export default async (base, ok, bad) => {
     await t('X yenileme', async () => { const j = await (await post(b2, '/api/x/refresh', { refresh_token: 'RT1' })).json(); return j.access_token === 'AT2' && j.refresh_token === 'RT2' || JSON.stringify(j); });
     await t('X yenileme reddi 401', async () => (await post(b2, '/api/x/refresh', { refresh_token: 'yok' })).status === 401 || 'beklenmedik');
     await t('X gönderi', async () => { const j = await (await post(b2, '/api/x/post', { access_token: 'AT2', text: 'Merhaba X', username: 'glowtest' })).json(); return j.id === '1999' && j.url === 'https://x.com/glowtest/status/1999' || JSON.stringify(j); });
+    await t('X config media.write istiyor', async () => (await (await fetch(b2 + '/api/x/config')).json()).scopes.includes('media.write') || 'eksik');
+    await t('X görselli gönderi', async () => {
+      const j = await (await post(b2, '/api/x/post', { access_token: 'AT2', text: 'Görselli', media: 'https://alanadin.com/media/' + IMG })).json();
+      const up1 = seen.find((s) => s.url === '/2/media/upload'), tw = seen.filter((s) => s.url === '/2/tweets').pop();
+      return j.id === '1999' && j.media === true && up1?.auth === 'Bearer AT2' && JSON.parse(tw.body).media?.media_ids?.[0] === '777' || JSON.stringify(j);
+    });
+    await t('X yalnızca görsel (metinsiz)', async () => { const r = await post(b2, '/api/x/post', { access_token: 'AT2', text: '', media: IMG }); return r.ok || `durum ${r.status}`; });
+    await t('X metin gönderisinde media yok', async () => { await post(b2, '/api/x/post', { access_token: 'AT2', text: 'Sadece metin' }); return !JSON.parse(seen.filter((s) => s.url === '/2/tweets').pop().body).media || 'media eklendi'; });
+    await t('X dış görsel adresi 400', async () => (await post(b2, '/api/x/post', { access_token: 'AT2', text: 'a', media: 'https://kotu.com/resim.png' })).status === 400 || 'beklenmedik');
+    await t('X olmayan görsel 400', async () => (await post(b2, '/api/x/post', { access_token: 'AT2', text: 'a', media: 'cd'.repeat(16) + '.jpg' })).status === 400 || 'beklenmedik');
+    await t('X görsel izni yok 403', async () => { const r = await post(b2, '/api/x/post', { access_token: 'ESKIIZIN', text: 'a', media: IMG }); const j = await r.json(); return r.status === 403 && /yeniden bağlan/.test(j.error) || `${r.status} ${j.error}`; });
     await t('X gönderi 281 karakter 400', async () => (await post(b2, '/api/x/post', { access_token: 'AT2', text: 'a'.repeat(281) })).status === 400 || 'beklenmedik');
     await t('X gönderi süresi dolmuş 401', async () => (await post(b2, '/api/x/post', { access_token: 'ESKI', text: 'a' })).status === 401 || 'beklenmedik');
     await t('X gönderi tekrar 409', async () => (await post(b2, '/api/x/post', { access_token: 'AT2', text: 'tekrar' })).status === 409 || 'beklenmedik');
     await t('X iptal', async () => (await (await post(b2, '/api/x/revoke', { token: 'RT2', hint: 'refresh_token' })).json()).ok === true || 'beklenmedik');
-  } finally { srv.kill(); mock.close(); }
+  } finally { srv.kill(); mock.close(); fs.rmSync(up, { recursive: true, force: true }); }
 };

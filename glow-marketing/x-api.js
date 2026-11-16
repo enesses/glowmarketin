@@ -5,8 +5,14 @@
 // .env: X_CLIENT_ID (zorunlu), X_CLIENT_SECRET (yalnızca "confidential client" ise),
 //       X_REDIRECT_URIS (isteğe bağlı, virgülle; boşsa PUBLIC_URL / ALLOWED_ORIGINS / localhost altındaki x-callback.html kabul edilir)
 
-const SCOPES = ['tweet.read', 'tweet.write', 'users.read', 'offline.access'];
+// media.write: görselli gönderi (POST /2/media/upload). Eski bağlantılarda bu izin yoksa arayüz "yeniden bağlan" der.
+const SCOPES = ['tweet.read', 'tweet.write', 'users.read', 'offline.access', 'media.write'];
 const MAX_WEIGHT = 280;
+const IMAGE_MAX = 5 * 1024 * 1024; // X tweet_image sınırı 5 MB
+const fs = require('fs');
+const path = require('path');
+// server.js ile aynı yükleme klasörü (/media/<32 hex>.jpg buradan sunulur)
+const UPLOADS = process.env.UPLOADS_DIR ? path.resolve(process.env.UPLOADS_DIR) : path.join(__dirname, 'uploads');
 
 function cfg() {
   const strip = (s) => String(s || '').trim().replace(/\/+$/, '');
@@ -61,6 +67,13 @@ async function xFetch(url, opts = {}) {
 
 function xError(r, j, ctx) {
   const detail = j.error_description || j.detail || j.errors?.[0]?.message || j.title || j.error || '';
+  if (ctx === 'media') {
+    if (r.status === 401) return err(401, 'X bağlantısının süresi doldu ya da izin kaldırıldı. Bağlantılar sayfasından yeniden bağlan.');
+    if (r.status === 403) return err(403, 'X görsel yükleme izni vermedi. Bağlantılar sayfasından X’e yeniden bağlan (görsel izni gerekiyor).');
+    if (r.status === 429) return err(429, 'X istek sınırına ulaşıldı. Biraz sonra tekrar dene.');
+    if (r.status === 400 || r.status === 413) return err(400, 'X görseli kabul etmedi' + (detail ? ': ' + detail : '. JPEG ve en fazla 5 MB olmalı.'));
+    return err(502, 'X görsel yükleme hatası (' + r.status + ')' + (detail ? ': ' + detail : ''));
+  }
   if (ctx === 'token') {
     if (j.error === 'invalid_request' || j.error === 'invalid_grant') return err(400, 'X yetkilendirme kodu geçersiz ya da süresi doldu (30 sn). Tekrar bağlan.');
     if (r.status === 401 || j.error === 'unauthorized_client' || j.error === 'invalid_client') return err(502, 'X uygulama kimliği/sırrı hatalı. Sunucudaki X_CLIENT_ID ve X_CLIENT_SECRET değerlerini kontrol et.');
@@ -89,6 +102,26 @@ async function me(c, token) {
   const { r, j } = await xFetch(c.api + '/2/users/me?user.fields=profile_image_url', { headers: { Authorization: 'Bearer ' + token } });
   if (!r.ok || !j.data) throw xError(r, j, 'api');
   return { id: j.data.id, username: j.data.username, name: j.data.name, avatar: j.data.profile_image_url || '' };
+}
+
+// İçerik görseli yalnızca bu sunucunun /media/<32 hex>.jpg dosyası olabilir (dış adres indirilmez → SSRF yok).
+function mediaFile(v) {
+  const m = typeof v === 'string' && v.length <= 512 && v.match(/(?:^|\/media\/)([a-f0-9]{32}\.jpg)$/);
+  return m ? path.join(UPLOADS, m[1]) : '';
+}
+
+// POST https://api.x.com/2/media/upload — tek istek, JSON gövde: media (base64) + media_category=tweet_image → data.id
+async function uploadImage(c, token, file) {
+  let buf;
+  try { buf = fs.readFileSync(file); } catch (_) { throw err(400, 'Gönderi görseli sunucuda bulunamadı. Görseli yeniden ekle.'); }
+  if (buf.length > IMAGE_MAX) throw err(400, 'X görselleri en fazla 5 MB olabilir. Daha küçük bir görsel ekle.');
+  const { r, j } = await xFetch(c.api + '/2/media/upload', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ media: buf.toString('base64'), media_category: 'tweet_image' }),
+  });
+  const id = j.data?.id || j.media_id_string;
+  if (!r.ok || !id) throw xError(r, j, 'media');
+  return String(id);
 }
 
 const str = (v, max) => (typeof v === 'string' && v.length > 0 && v.length <= max ? v : '');
@@ -138,10 +171,13 @@ async function handle(req, res, url, { send, readBody, limited, ip }) {
 
   // /api/x/post → POST https://api.x.com/2/tweets
   const text = typeof b.text === 'string' ? b.text.trim() : '';
-  if (!text) return send(res, 400, { error: 'Gönderi metni boş.' });
+  const file = b.media ? mediaFile(b.media) : '';
+  if (b.media && !file) return send(res, 400, { error: 'Görsel bu sunucuya yüklenmiş olmalı.' });
+  if (!text && !file) return send(res, 400, { error: 'Gönderi metni boş.' });
   const w = weightedLength(text);
   if (w > MAX_WEIGHT) return send(res, 400, { error: `X gönderisi en fazla ${MAX_WEIGHT} karakter olabilir (şu an ${w}).`, length: w });
-  const body = { text };
+  const body = text ? { text } : {};
+  if (file) body.media = { media_ids: [await uploadImage(c, token, file)] };
   if (b.reply_to != null) {
     if (!/^\d{1,20}$/.test(String(b.reply_to))) return send(res, 400, { error: 'Geçersiz yanıt kimliği.' });
     body.reply = { in_reply_to_tweet_id: String(b.reply_to) };
@@ -149,8 +185,8 @@ async function handle(req, res, url, { send, readBody, limited, ip }) {
   const { r, j } = await xFetch(c.api + '/2/tweets', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!r.ok || !j.data?.id) throw xError(r, j, 'api');
   const user = str(b.username, 15).replace(/[^A-Za-z0-9_]/g, '');
-  console.log(`[x] gönderi ${j.data.id}`);
-  return send(res, 200, { id: j.data.id, text: j.data.text, url: user ? `https://x.com/${user}/status/${j.data.id}` : `https://x.com/i/web/status/${j.data.id}` });
+  console.log(`[x] gönderi ${j.data.id}${file ? ' (görselli)' : ''}`);
+  return send(res, 200, { id: j.data.id, text: j.data.text, media: Boolean(file), url: user ? `https://x.com/${user}/status/${j.data.id}` : `https://x.com/i/web/status/${j.data.id}` });
 }
 
 module.exports = { handle, weightedLength, redirectOk, SCOPES, MAX_WEIGHT };

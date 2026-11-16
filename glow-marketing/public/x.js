@@ -12,6 +12,17 @@
   function store(v){ try{ if(v) localStorage.setItem(KEY,JSON.stringify(v)); else localStorage.removeItem(KEY); }catch(e){} }
   var X=load();
   function connected(){ return !!(X&&X.accessToken&&X.user); }
+  // İzin (scope) listesi büyüdüyse (ör. media.write eklendi) eski bağlantı yeniden bağlanmalı; yenileme eski izinleri korur.
+  function hasScope(s){ return !!X&&(' '+String(X.scope||'')+' ').indexOf(' '+s+' ')>=0; }
+  function missingScopes(){
+    if(!connected()) return [];
+    var want=(S.cfg&&S.cfg.scopes&&S.cfg.scopes.length)?S.cfg.scopes:['media.write'];
+    return want.filter(function(s){ return !hasScope(s); });
+  }
+  function scopeOld(){ return missingScopes().length>0; }
+  // Mobil uygulama (Capacitor): açılır pencere + x-callback.html akışı çalışmaz
+  function native(){ try{ return location.protocol==='capacitor:'||location.protocol==='ionic:'||!!(window.Capacitor&&(window.Capacitor.isNativePlatform?window.Capacitor.isNativePlatform():window.Capacitor.platform&&window.Capacitor.platform!=='web')); }catch(e){ return false; } }
+  var NATIVE_MSG='X bağlantısı web sürümünden yapılmalı. Mobil uygulamada X girişi henüz desteklenmiyor; X’te paylaşmak için Glow’u tarayıcıda aç.';
 
   /* ---------- 280 karakter (X ağırlıklı sayım; sunucudaki x-api.js ile aynı kural) ---------- */
   var seg=(typeof Intl!=='undefined'&&Intl.Segmenter)?new Intl.Segmenter('tr',{granularity:'grapheme'}):null;
@@ -53,6 +64,7 @@
   function redirectUri(){ return location.origin+location.pathname.replace(/[^\/]*$/,'')+'x-callback.html'; }
 
   async function connect(){
+    if(native()) throw new Error(NATIVE_MSG);
     if(!/^https?:$/.test(location.protocol)) throw new Error('X girişi için uygulamanın bir web adresinden (https) açılması gerekiyor.');
     if(!window.crypto||!crypto.getRandomValues) throw new Error('Bu tarayıcı güvenli bağlantıyı desteklemiyor.');
     // Açılır pencereyi kullanıcı tıklamasıyla hemen aç (engellenmesin), adresi sonra ver.
@@ -80,8 +92,11 @@
       var t=setInterval(function(){ if(w.closed) setTimeout(function(){ finish(rej,new Error('X penceresi kapatıldı.')); },600); },700);
     });
     var j=await api('/api/x/token',{code:code,code_verifier:verifier,redirect_uri:redirect});
+    var prev=X;
     X={accessToken:j.access_token,refreshToken:j.refresh_token||'',expiresAt:Date.now()+(j.expires_in||7200)*1000,scope:j.scope||'',user:j.user,bagTarih:new Date().toISOString()};
     store(X);
+    // Yeniden bağlanıldıysa eski anahtarı X'te iptal et (sessizce)
+    if(prev&&prev.refreshToken&&prev.refreshToken!==X.refreshToken) api('/api/x/revoke',{token:prev.refreshToken,hint:'refresh_token'}).catch(function(){});
     return X.user;
   }
 
@@ -97,9 +112,14 @@
   function markExpired(){ if(X){ X.hata='token'; store(X); ctx.onChange(); } }
   async function fresh(){ if(!connected()) throw new Error('X hesabı bağlı değil.'); if(!X.expiresAt||X.expiresAt-60000<Date.now()) await refresh(); }
 
-  async function postText(text){
+  // opts.media: içerik görseli (bu sunucunun /media/<id>.jpg adresi). Yoksa yalnızca metin.
+  async function postText(text,opts){
     await fresh();
     var body={access_token:X.accessToken,text:text,username:X.user.username};
+    if(opts&&opts.media){
+      if(!hasScope('media.write')){ var se=new Error('Görselli paylaşım için X’e yeniden bağlanman gerekiyor (yeni görsel izni).'); se.status=403; se.scope=true; throw se; }
+      body.media=opts.media;
+    }
     try{ return await api('/api/x/post',body); }
     catch(e){
       if(e.status!==401) throw e;
@@ -116,20 +136,22 @@
   /* ---------- Arayüz ---------- */
   function rerender(){ var el=document.getElementById('xConnCard'); if(el) el.outerHTML=card(); ctx.onChange(); }
   function card(){
-    var esc=ctx.esc, on=connected(), exp=on&&X.hata==='token', b;
+    var esc=ctx.esc, on=connected(), exp=on&&X.hata==='token', old=on&&!exp&&scopeOld(), nat=native(), b;
     if(on){
       b='<div class="conn-loc"><strong>@'+esc(X.user.username)+'</strong><span>'+esc(X.user.name||'')+'</span></div>'+
         (exp?'<p class="warn-line">Bağlantının süresi dolmuş. Yeniden bağlan.</p>':'')+
+        (old?'<p class="warn-line">Görselli gönderi için yeni bir izin gerekiyor. X’e yeniden bağlan; metin paylaşımı bu arada çalışmaya devam eder.</p>':'')+
+        (nat&&(exp||old)?'<p class="warn-line">'+esc(NATIVE_MSG)+'</p>':'')+
         '<p class="hint">“X” platformundaki içeriklerini içerik penceresinden tek tıkla paylaşırsın. Gönderiler en fazla 280 karakter (bağlantılar 23, emoji 2 sayılır).</p>'+
-        '<div class="actions">'+(exp?'<button class="btn btn-primary btn-sm" data-xaction="connect">Yeniden bağlan</button>':'')+
+        '<div class="actions">'+((exp||old)&&!nat?'<button class="btn btn-primary btn-sm" data-xaction="connect">Yeniden bağlan</button>':'')+
         '<button class="btn btn-quiet btn-sm" data-xaction="disconnect" style="color:var(--bad)">Bağlantıyı kes</button></div>';
     }else{
       var off=S.cfg&&!S.cfg.enabled;
       b='<p class="muted" style="font-size:14px">Bağladığında “X” platformundaki içeriklerini doğrudan X hesabında paylaşırsın.</p>'+
         (off?'<p class="warn-line">Sunucuda X uygulama kimliği (X_CLIENT_ID) tanımlı değil. Yönetici kurulumu aşağıda.</p>':'')+
         (S.cfgErr?'<p class="warn-line">'+esc(S.cfgErr)+'</p>':'')+
-        '<div><button class="btn btn-primary'+(S.busy==='connect'?' loading':'')+'" data-xaction="connect"><span style="font-weight:800">𝕏</span>X ile bağlan</button></div>'+
-        '<p class="hint">Yalnızca gönderi paylaşma ve hesap adını okuma izni istenir; özel mesajlarına erişilmez.</p>'+
+        (nat?'<p class="warn-line">'+esc(NATIVE_MSG)+'</p>':'<div><button class="btn btn-primary'+(S.busy==='connect'?' loading':'')+'" data-xaction="connect"><span style="font-weight:800">𝕏</span>X ile bağlan</button></div>')+
+        '<p class="hint">Yalnızca gönderi ve görsel paylaşma, hesap adını okuma izni istenir; özel mesajlarına erişilmez.</p>'+
         (off||S.cfgErr?'<details class="hint" style="margin-top:4px"><summary style="cursor:pointer;font-weight:700">X kurulumu (yönetici, bir kerelik)</summary><ol class="steps" style="margin-top:8px">'+
           '<li><span><a href="https://developer.x.com/en/portal/dashboard" target="_blank" rel="noopener" style="color:var(--accent-ink);font-weight:700">X Developer Portal</a>’da bir uygulama oluştur; <b>User authentication settings</b>’te OAuth 2.0’ı aç, izin: <b>Read and write</b>, tür: <b>Web App (confidential client)</b>.</span></li>'+
           '<li><span><b>Callback URI</b> olarak şunu ekle: <code>'+esc(/^https?:$/.test(location.protocol)?redirectUri():'https://alanadin.com/x-callback.html')+'</code></span></li>'+
@@ -138,7 +160,7 @@
     }
     return '<div class="card conn-card" id="xConnCard">'+
       '<div class="conn-head"><div class="conn-logo x" style="background:var(--xx-soft);color:var(--xx)">𝕏</div><div><h3>X (Twitter)</h3><p>Gönderi paylaşma</p></div>'+
-      '<span class="conn-status '+(on&&!exp?'on':'off')+'"><i class="ai-dot"></i>'+(on?(exp?'Yeniden bağlan':'Bağlı'):'Bağlı değil')+'</span></div>'+b+'</div>';
+      '<span class="conn-status '+(on&&!exp?'on':'off')+'"><i class="ai-dot"></i>'+(on?(exp||old?'Yeniden bağlan':'Bağlı'):'Bağlı değil')+'</span></div>'+b+'</div>';
   }
 
   document.addEventListener('click',async function(e){
@@ -157,9 +179,15 @@
   });
 
   window.GlowX={
-    init:function(o){ for(var k in o) if(o[k]) ctx[k]=o[k]; if(!connected()) config().then(function(){ var el=document.getElementById('xConnCard'); if(el) el.outerHTML=card(); }); },
+    init:function(o){ for(var k in o) if(o[k]) ctx[k]=o[k]; config().then(function(){ var el=document.getElementById('xConnCard'); if(el) el.outerHTML=card(); }); },
     connected:function(){ return connected()&&X.hata!=='token'; },
     expired:function(){ return connected()&&X.hata==='token'; },
+    scopeOld:function(){ return connected()&&X.hata!=='token'&&scopeOld(); },
+    canMedia:function(){ return connected()&&X.hata!=='token'&&hasScope('media.write'); },
+    native:native,
+    nativeMsg:NATIVE_MSG,
+    // "Verileri sıfırla": bu tarayıcıdaki X anahtarını sil, X'teki izni sessizce iptal et
+    reset:function(){ var old=X; X=null; store(null); try{ localStorage.removeItem(KEY); }catch(e){} if(old) api('/api/x/revoke',{token:old.refreshToken||old.accessToken,hint:old.refreshToken?'refresh_token':'access_token'}).catch(function(){}); var el=document.getElementById('xConnCard'); if(el) el.outerHTML=card(); },
     username:function(){ return connected()?X.user.username:''; },
     card:card,
     weightedLength:weightedLength,

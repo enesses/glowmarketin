@@ -1936,16 +1936,16 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
       else if(pf==='instagram'&&!appData.meta.igId) not='Bağlı Facebook sayfasına bağlı bir Instagram işletme hesabı yok.';
       else not=pf==='instagram'?`@${appData.meta.igUsername} hesabında yayınlanır. Instagram için görsel ya da video zorunlu.`:`“${appData.meta.pageName}” sayfasında yayınlanır. Görsel isteğe bağlı.`;
     }
-    else if(pf==='x') not=!GX?'X için metni kopyalayıp uygulamada paylaşabilirsin.':c?.yayinlar?.x?`X’te paylaşıldı · ${tarihFmt(c.yayinlar.x.tarih)}. Aynı metni tekrar paylaşmak X’te reddedilebilir.`:GX.connected()?`@${GX.username()} hesabında paylaşılır. En fazla 280 karakter; bağlantılar 23, emoji 2 sayılır.`:GX.expired()?'X bağlantısının süresi dolmuş. Bağlantılar sayfasından yeniden bağlan.':'X’te paylaşmak için Bağlantılar sayfasından X hesabını bağla.';
+    else if(pf==='x') not=!GX?'X için metni kopyalayıp uygulamada paylaşabilirsin.':c?.yayinlar?.x?`X’te paylaşıldı · ${tarihFmt(c.yayinlar.x.tarih)}. Aynı metni tekrar paylaşmak X’te reddedilebilir.`:GX.connected()?(icerikVideo?'X’e video gönderimi henüz yok; yalnızca metin paylaşılır.':icerikGorsel&&!GX.canMedia()?'Görselli paylaşım için Bağlantılar sayfasından X’e yeniden bağlan (yeni görsel izni).':`@${GX.username()} hesabında ${icerikGorsel?'görselle ':''}paylaşılır. En fazla 280 karakter; bağlantılar 23, emoji 2 sayılır.`):GX.expired()?'X bağlantısının süresi dolmuş. Bağlantılar sayfasından yeniden bağlan.':GX.native()?GX.nativeMsg:'X’te paylaşmak için Bağlantılar sayfasından X hesabını bağla.';
     $('icerikGoogleNot').textContent=not;
-    const gAlan=$('gorselAlan'); gAlan.classList.toggle('hidden',!(pf==='instagram'||pf==='facebook'));
+    const gAlan=$('gorselAlan'); gAlan.classList.toggle('hidden',!(pf==='instagram'||pf==='facebook'||(pf==='x'&&GX)));
     renderGorselKutu(pf);
   }
   function renderGorselKutu(pf){
     const k=$('gorselKutu'); if(!k) return;
     $('gorselEtiket').textContent=icerikVideo?'video':pf==='instagram'?'zorunlu':'isteğe bağlı';
     if(gorselYukleniyor){ k.innerHTML=`<div class="ph-ico">${ic('refresh')}</div><div class="txt"><b>Yükleniyor…</b>Görsel hazırlanıyor ve sunucuya gönderiliyor.</div>`; return; }
-    if(icerikVideo){ k.innerHTML=`<video src="${esc(icerikVideo)}" muted playsinline preload="metadata" style="width:72px;height:72px;object-fit:cover;border-radius:10px;background:#000;flex-shrink:0"></video><div class="txt"><b>AI video eklendi</b>${pf==='instagram'?'Reels olarak yayınlanır.':'Sayfanda video olarak yayınlanır.'}</div><div class="acts"><button type="button" class="btn btn-quiet btn-sm" data-action="video-sil">Kaldır</button></div>`; return; }
+    if(icerikVideo){ k.innerHTML=`<video src="${esc(icerikVideo)}" muted playsinline preload="metadata" style="width:72px;height:72px;object-fit:cover;border-radius:10px;background:#000;flex-shrink:0"></video><div class="txt"><b>AI video eklendi</b>${pf==='instagram'?'Reels olarak yayınlanır.':pf==='x'?'X’e video gönderimi henüz yok.':'Sayfanda video olarak yayınlanır.'}</div><div class="acts"><button type="button" class="btn btn-quiet btn-sm" data-action="video-sil">Kaldır</button></div>`; return; }
     if(icerikGorsel){ k.innerHTML=`<img src="${esc(icerikGorsel)}" alt="Gönderi görseli"><div class="txt"><b>Görsel hazır</b>JPEG, Instagram oranlarına uygun.</div><div class="acts"><button type="button" class="btn btn-ghost btn-sm" data-action="gorsel-sec">Değiştir</button><button type="button" class="btn btn-quiet btn-sm" data-action="gorsel-sil">Kaldır</button></div>`; return; }
     const hazir=AI.media;
     k.innerHTML=`<div class="ph-ico">${ic('box')}</div><div class="txt"><b>Görsel ekle</b>${hazir?'Fotoğraf otomatik olarak JPEG’e çevrilir ve Instagram oranına (4:5 – 1,91:1) kırpılır.':'Görsel yüklemek için yapay zekâ sunucusunda PUBLIC_URL ayarlı olmalı.'}</div>${hazir?`<div class="acts"><button type="button" class="btn btn-ghost btn-sm" data-action="gorsel-sec">Seç</button></div>`:''}`;
@@ -2365,17 +2365,23 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     const metin=$('modalIcerikMetin').value.trim(), btn=$('btnModalIcerikYayinla');
     if(!GX||btn.classList.contains('loading')) return;
     if(!GX.connected()){ toast(GX.expired()?'X bağlantısının süresi dolmuş. Yeniden bağlan.':'Önce X hesabını bağla.',true); closeModal(); return go('baglantilar'); }
-    if(!metin) return toast('X’te paylaşmak için metin gerekli.',true);
+    if(gorselYukleniyor) return toast('Görsel yüklenirken bekle.',true);
+    let gorsel=icerikVideo?'':icerikGorsel;
+    if(!metin&&!gorsel) return toast('X’te paylaşmak için metin ya da görsel gerekli.',true);
+    if(gorsel&&!GX.canMedia()){
+      if(!metin||!await confirmAsk({title:'Görsel için yeniden bağlanman gerekiyor',text:'X bağlantın görsel yükleme iznini içermiyor. Bağlantılar sayfasından X’e yeniden bağlanabilirsin. Şimdilik görselsiz, yalnızca metin paylaşılsın mı?',ok:'Yalnızca metni paylaş'})){ if(!metin) toast('Görselli paylaşım için X’e yeniden bağlan.',true); return; }
+      gorsel='';
+    }
     const n=GX.weightedLength(metin); if(n>GX.MAX) return toast(`X gönderisi en fazla ${GX.MAX} karakter olabilir (şu an ${n}).`,true);
     if(/\[[^\]]{2,}\]/.test(metin)) return toast('Metinde doldurulmamış [yer tutucu] var. Önce onu düzenle.',true);
-    if(!await confirmAsk({title:'X’te paylaşılsın mı?',text:`Bu gönderi @${GX.username()} hesabında herkese açık olarak paylaşılacak.`,ok:'Paylaş'})) return;
+    if(!await confirmAsk({title:'X’te paylaşılsın mı?',text:`Bu gönderi${gorsel?' görseliyle birlikte':''} @${GX.username()} hesabında herkese açık olarak paylaşılacak.${icerikVideo?' Video X’e gönderilmez; yalnızca metin paylaşılır.':''}`,ok:'Paylaş'})) return;
     const idx=saveIcerik(false); if(idx===null) return;
     busy(btn,true,'Paylaşılıyor…');
     try{
-      const r=await GX.publish(metin), c=appData.icerikler[idx];
+      const r=await GX.publish(metin,{media:gorsel}), c=appData.icerikler[idx];
       if(c){ c.yayinlar={...(c.yayinlar||{}),x:{id:r.id,tarih:new Date().toISOString(),url:r.url}}; save(); }
       busy(btn,false); toast('X’te paylaşıldı.'); closeModal(); renderAll();
-    }catch(e){ busy(btn,false); toast(e.message,true); if(e.status===401) updateIcerikGoogleUI(); }
+    }catch(e){ busy(btn,false); toast(e.message,true); if(e.status===401||e.status===403) updateIcerikGoogleUI(); }
   }
   async function metaYayinlaModal(pf){
     const metin=$('modalIcerikMetin').value.trim(), ad=pf==='instagram'?'Instagram':'Facebook';
@@ -3275,6 +3281,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
   async function resetAll(){
     if(!await confirmAsk({title:'Tüm veriler silinsin mi?',text:'İşletme profili, içerikler, yorumlar ve kredi bilgisi kalıcı olarak silinir. Bu işlem geri alınamaz.',ok:'Evet, sil',danger:true})) return;
     try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    if(GX) GX.reset(); // X anahtarı ayrı tutulur (localStorage.glowX)
     appData=defaults(); G.token=null; G.locs=null; MG.pages=null; gecmis.length=0; setupSss=[]; $('setupForm').reset(); showSetup(); toast('Tüm veriler silindi.');
   }
 
