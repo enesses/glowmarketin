@@ -306,6 +306,8 @@ svg{display:block;flex-shrink:0}
 .usage{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:16px;margin-top:20px}
 .banner{display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:var(--r);background:var(--bad-soft);color:var(--bad);font-weight:600;font-size:14px;margin-bottom:18px}
 .banner svg{width:20px;height:20px}
+.note-warn{padding:12px 16px;border-radius:var(--r);background:var(--surface-2);border:1px dashed var(--line);color:var(--ink-2);font-size:13.5px;margin-bottom:18px;overflow-wrap:anywhere}
+.note-warn code{font-size:12.5px;background:var(--sunken);padding:1px 5px;border-radius:5px}
 
 /* ---------- Empty ---------- */
 .empty{text-align:center;padding:44px 24px;border:1px dashed var(--line-2);border-radius:var(--r-lg);background:var(--surface-2)}
@@ -837,6 +839,7 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
           <div><div class="eyebrow">Hesap</div><h1 class="page-title">Paket ve kullanım</h1><p class="page-sub">Taslak, yorum yanıtı ve müşteri yanıtı önerisi 1 kredi; haftalık plan 3 kredi harcar. AI video süresine göre 20–50 kredi.</p></div>
         </div>
         <div id="krediBanner" class="banner hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>Kredin bitti. Yeni taslak üretmek için paketini yenile ya da yükselt.</div>
+        <div id="yasalEksikNot" class="note-warn hidden" role="note"></div>
         <div class="plans" id="paketListesi"></div>
         <p class="plans-note">Paket seçerek <a href="?sayfa=abonelik">Abonelik ve Ödeme Koşulları</a>’nı ve <a href="?sayfa=mesafeli">Mesafeli Satış Sözleşmesi</a>’ni kabul etmiş olursun. Aboneliği istediğin an iptal edebilirsin; iptal dönem sonunda geçerli olur.</p>
         <div class="usage">
@@ -1565,6 +1568,41 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     metaAppId:'',        // Meta for Developers → Uygulama Kimliği (App ID). Örn: '1234567890123456'
     graphVersion:'v25.0' // Meta Graph API sürümü
   },window.GLOW_CONFIG||{});
+  /* Yasal metinlerdeki şirket bilgileri — TEK YER. Gerçek resmî bilgilerle doldur (uydurma değer yazma).
+     Boş bırakılan alan metinde sarı yer tutucu olarak görünür ve Paket sayfasında "yasal bilgiler eksik" notu çıkar.
+     window.GLOW_CONFIG = { sirket: { unvan:'…', ... } } ile de verilebilir. */
+  CONFIG.sirket=Object.assign({
+    unvan:'',          // [ŞİRKET UNVANI]   Ticaret sicilindeki tam unvan
+    adres:'',          // [ŞİRKET ADRESİ]   Tebligat / merkez adresi
+    mersis:'',         // [MERSİS NO]
+    vergi:'',          // [VERGİ DAİRESİ / NO]  Örn. biçim: 'X Vergi Dairesi / 0000000000'
+    kvkkEposta:'',     // [KVKK E-POSTASI]  KVKK / GDPR başvuru adresi
+    kep:'',            // [KEP ADRESİ]
+    destekEposta:'',   // [DESTEK E-POSTASI]
+    telefon:'',        // [TELEFON]
+    barindirma:'',     // [BARINDIRMA SAĞLAYICISI]  Sunucunun barındırıldığı şirket
+    odemeKurulusu:''   // [ÖDEME KURULUŞU]  Ödemeyi alan lisanslı ödeme kuruluşu
+  },(window.GLOW_CONFIG&&window.GLOW_CONFIG.sirket)||{});
+  const SIRKET_YER={'[ŞİRKET UNVANI]':'unvan','[ŞİRKET ADRESİ]':'adres','[MERSİS NO]':'mersis','[VERGİ DAİRESİ / NO]':'vergi','[KVKK E-POSTASI]':'kvkkEposta','[KEP ADRESİ]':'kep','[DESTEK E-POSTASI]':'destekEposta','[TELEFON]':'telefon','[BARINDIRMA SAĞLAYICISI]':'barindirma','[ÖDEME KURULUŞU]':'odemeKurulusu'};
+  const SIRKET_AD={unvan:'şirket unvanı',adres:'şirket adresi',mersis:'MERSİS no',vergi:'vergi dairesi / no',kvkkEposta:'KVKK e-postası',kep:'KEP adresi',destekEposta:'destek e-postası',telefon:'telefon',barindirma:'barındırma sağlayıcısı',odemeKurulusu:'ödeme kuruluşu'};
+  function sirketDeger(k){ const v=CONFIG.sirket[k]; return typeof v==='string'?v.trim():(v==null?'':String(v).trim()); }
+  // Yer tutucuları (mark.ph) CONFIG.sirket değerleriyle doldurur; boş olanlar yer tutucu olarak kalır.
+  function sirketUygula(){
+    const eksik=new Set();
+    document.querySelectorAll('mark.ph').forEach(m=>{
+      const yer=m.dataset.yer||m.textContent.trim(), k=SIRKET_YER[yer]; if(!k) return;
+      m.dataset.yer=yer;
+      const v=sirketDeger(k);
+      if(!v){ eksik.add(k); return; }
+      const span=document.createElement('span'); span.className='sirket-bilgi'; span.dataset.yer=yer;
+      if(/eposta$/i.test(k)&&/^[^\s@]+@[^\s@]+$/.test(v)){ const a=document.createElement('a'); a.href='mailto:'+v; a.textContent=v; span.appendChild(a); }
+      else span.textContent=v;
+      m.replaceWith(span);
+    });
+    return [...eksik];
+  }
+  const SIRKET_EKSIK=sirketUygula();
+  if(SIRKET_EKSIK.length) try{ console.warn('Glow Marketing: yasal metinlerde eksik şirket bilgisi (CONFIG.sirket):',SIRKET_EKSIK.join(', ')); }catch(e){}
 
   /* ---------- Storage ---------- */
   const STORAGE_KEY='glowMarketingApp';
@@ -3153,6 +3191,8 @@ html.is-legal #legalView .lv-page+.lv-page{margin-top:0}
     $('paketToplamTaslak').textContent=appData.toplamTaslak;
     $('paketAktif').textContent=appData.paket; $('paketAktifFiyat').textContent=`${p.fiyat}$ / ay`;
     $('krediBanner').classList.toggle('hidden',appData.kredi>0);
+    const yn=$('yasalEksikNot');
+    if(yn){ yn.classList.toggle('hidden',!SIRKET_EKSIK.length); if(SIRKET_EKSIK.length) yn.innerHTML=`<b>Yönetici notu · Yasal bilgiler eksik:</b> ${esc(SIRKET_EKSIK.map(k=>SIRKET_AD[k]).join(', '))}. Sözleşme ve KVKK metinlerinde yer tutucu görünüyor; yayından önce <code>public/index.html</code> içindeki <code>CONFIG.sirket</code> alanlarını gerçek bilgilerle doldur.`; }
   }
   async function choosePlan(k){
     const p=PLANS[k]; const same=k===appData.paket;
