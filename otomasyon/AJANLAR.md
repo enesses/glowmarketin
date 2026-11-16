@@ -49,3 +49,10 @@ Birleştirici 10:20'de çalışır. Dallar main'in güncel hâlinden yeniden aç
 | sunucu | `ajan/sunucu` | 1) Bilinmeyen `/api/*` her yöntemde **JSON 404**. 2) Video indirmesini belleğe almadan **akışla diske** yaz (256 MB sınırı ve atomik `.tmp`→rename korunsun). 3) `/api/health`'e `x` ve `metaAds` (yapılandırıldı mı) bayrakları. 4) Tüm uçları gözden geçir: X ve Meta Ads uçları dahil hata mesajları Türkçe ve tutarlı, gizli anahtar hiçbir yanıtta/logda yok. |
 
 Gerçek hesap/anahtar gerektiren işler (X Developer Portal, Meta App Review, .env değerleri) ajanların kapsamı dışında — kullanıcı yapacak; durum dosyasında "Kullanıcının yapması gerekenler" altında güncel tut.
+
+---
+
+## Video skill'leri (16 Kasım 2026'da eklendi)
+Claude ile video üretimi/kurgusu için 53 skill `.claude/skills/` altında. Hangisinin ne işe yaradığı,
+lisansları ve Glow için önerilen kullanım: `otomasyon/VIDEO-REPOLARI.md`. Motor HyperFrames;
+onetake ve lemo-opuscar ticari olmayan lisanslı olduğu için eklenmedi.

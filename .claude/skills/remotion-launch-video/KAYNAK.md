@@ -1,0 +1,1 @@
+Kaynak: https://github.com/shadcn-labs/snapcn (lisans: bu klasördeki LICENSE). Glow ekibi için kopyalandı, 16 Kasım 2026. Büyük örnek/medya klasörleri (examples, assets) boyut için çıkarıldı; gerekirse kaynak repodan alın.
