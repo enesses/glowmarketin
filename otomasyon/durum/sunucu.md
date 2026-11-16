@@ -1,7 +1,17 @@
 # Durum — sunucu
 
 ## 16 Kasım (2. gün)
-Henüz başlamadı. Görevler: otomasyon/AJANLAR.md → "16 Kasım" tablosu.
+Durum: çalışıyor (1. dalga, 07:30 başladı).
+
+### Yapılanlar
+- [1] Bilinmeyen `/api/*` (ve `/api`) her yöntemde JSON 404 `{error:'Bu API ucu bulunamadı.'}`; statik aramaya düşmüyor. `/api/x/*` 404'ü zaten x-api.js'te JSON.
+- [3] `/api/health` → `x` (X_CLIENT_ID var mı) ve `metaAds` (META_APP_ID+SECRET var mı) bayrakları; yalnızca boolean. `/api/health` GET/HEAD dışı → 405.
+- Statik dosyalar artık HEAD'e de yanıt veriyor; API dışı GET/HEAD olmayan istek → JSON 405.
+- Test: `otomasyon/testler/sunucu-api.mjs`.
+
+### Kalanlar
+- [2] Video indirmesini akışla diske yazma.
+- [4] Uç uç hata mesajı / gizli anahtar sızıntısı denetimi.
 
 ---
 # 15 Kasım (1. gün) kaydı

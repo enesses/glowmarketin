@@ -628,8 +628,10 @@ const server = http.createServer(async (req, res) => {
   cors(req, res);
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   try {
-    if (url.pathname === '/api/health' && req.method === 'GET') {
-      return send(res, 200, { ok: true, surum: VERSION, calisma: Math.round(process.uptime()), ai: Boolean(KEY), model: MODEL, ajanlar: Object.keys(AGENTS), media: Boolean(PUBLIC_URL), video: Boolean(videoProvider() && PUBLIC_URL), videoModel: VIDEO_MODEL });
+    if (url.pathname === '/api/health') {
+      if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'Yalnızca GET.' });
+      // x / metaAds: yalnızca "yapılandırıldı mı" bayrağı; anahtar değerleri asla yanıtlanmaz
+      return send(res, 200, { ok: true, surum: VERSION, calisma: Math.round(process.uptime()), ai: Boolean(KEY), model: MODEL, ajanlar: Object.keys(AGENTS), media: Boolean(PUBLIC_URL), video: Boolean(videoProvider() && PUBLIC_URL), videoModel: VIDEO_MODEL, x: Boolean(String(process.env.X_CLIENT_ID || '').trim()), metaAds: metaAdsReady() });
     }
     if (url.pathname === '/api/meta-ads/status' && req.method === 'GET') {
       return send(res, 200, { exchange: metaAdsReady(), graphVersion: META_GRAPH_VERSION });
@@ -693,8 +695,10 @@ const server = http.createServer(async (req, res) => {
       delete out.usage;
       return send(res, 200, out);
     }
-    if (req.method === 'GET') return serveStatic(req, res);
-    send(res, 404, { error: 'Bulunamadı.' });
+    // Bilinmeyen /api/* her yöntemde JSON 404 (statik dosya aramasına düşmesin)
+    if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return send(res, 404, { error: 'Bu API ucu bulunamadı.' });
+    if (req.method === 'GET' || req.method === 'HEAD') return serveStatic(req, res);
+    send(res, 405, { error: 'Bu yöntem desteklenmiyor.' });
   } catch (e) {
     if (e instanceof URIError) e = httpErr(400, 'Geçersiz adres.');
     if (!e.status) console.error(e);
